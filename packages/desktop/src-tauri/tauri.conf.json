@@ -54,15 +54,6 @@
   "plugins": {
     "shell": {
       "open": true
-    },
-    "fs": {
-      "scope": {
-        "allow": ["$APPDATA/**", "$DATA/**", "$RESOURCE/**"],
-        "deny": []
-      }
-    },
-    "sql": {
-      "preload": ["sqlite:nextest.db"]
     }
   }
 }
