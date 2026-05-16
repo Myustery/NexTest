@@ -60,8 +60,8 @@ jobs:
 
       - name: 构建 Tauri 应用（便携版）
         run: |
-          cd packages/desktop
-          pnpm tauri build --bundles none
+          cd packages/desktop/src-tauri
+          cargo build --release
         env:
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
