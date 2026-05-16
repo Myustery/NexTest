@@ -64,20 +64,46 @@ jobs:
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
 
+      - name: 调试 - 列出构建产物
+        run: |
+          Write-Host "=== 根目录 target/release ==="
+          Get-ChildItem -Path "target/release" -Filter "*.exe" -ErrorAction SilentlyContinue
+          Write-Host "=== packages/desktop target/release ==="
+          Get-ChildItem -Path "packages/desktop/src-tauri/target/release" -Filter "*.exe" -ErrorAction SilentlyContinue
+          Write-Host "=== 搜索所有 exe 文件 ==="
+          Get-ChildItem -Path "." -Filter "*.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
+        shell: pwsh
+
       - name: 重命名便携版可执行文件
         run: |
           $version = $env:GITHUB_REF_NAME -replace 'v', ''
           if ($version -eq 'main' -or $version -eq 'develop') {
             $version = '0.1.0-dev'
           }
-          Move-Item -Path "target/release/NexTest.exe" -Destination "target/release/NexTest-${version}-Portable.exe"
+          $exePath = ""
+          if (Test-Path "target/release/NexTest.exe") {
+            $exePath = "target/release/NexTest.exe"
+          } elseif (Test-Path "target/release/nextest-desktop.exe") {
+            $exePath = "target/release/nextest-desktop.exe"
+          } elseif (Test-Path "packages/desktop/src-tauri/target/release/NexTest.exe") {
+            $exePath = "packages/desktop/src-tauri/target/release/NexTest.exe"
+          } elseif (Test-Path "packages/desktop/src-tauri/target/release/nextest-desktop.exe") {
+            $exePath = "packages/desktop/src-tauri/target/release/nextest-desktop.exe"
+          }
+          if ($exePath) {
+            Move-Item -Path $exePath -Destination "NexTest-${version}-Portable.exe"
+            Write-Host "Successfully created: NexTest-${version}-Portable.exe"
+          } else {
+            Write-Error "Could not find exe file"
+            exit 1
+          }
         shell: pwsh
 
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
         with:
           name: NexTest-Windows-Portable
-          path: target/release/NexTest-*-Portable.exe
+          path: NexTest-*-Portable.exe
           retention-days: 30
 
   release:
