@@ -59,9 +59,7 @@ jobs:
         run: pnpm --filter @nextest/desktop build
 
       - name: 构建 Tauri 应用（便携版）
-        run: |
-          cd packages/desktop/src-tauri
-          cargo build --release
+        run: cargo build --release -p nextest-desktop
         env:
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
@@ -72,14 +70,14 @@ jobs:
           if ($version -eq 'main' -or $version -eq 'develop') {
             $version = '0.1.0-dev'
           }
-          Move-Item -Path "packages/desktop/src-tauri/target/release/NexTest.exe" -Destination "packages/desktop/src-tauri/target/release/NexTest-${version}-Portable.exe"
+          Move-Item -Path "target/release/NexTest.exe" -Destination "target/release/NexTest-${version}-Portable.exe"
         shell: pwsh
 
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
         with:
           name: NexTest-Windows-Portable
-          path: packages/desktop/src-tauri/target/release/NexTest-*-Portable.exe
+          path: target/release/NexTest-*-Portable.exe
           retention-days: 30
 
   release:
