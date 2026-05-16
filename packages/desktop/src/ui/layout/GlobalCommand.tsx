@@ -19,7 +19,7 @@ interface GlobalCommandProps {
 /**
  * 全局命令编辑页面组件
  */
-function GlobalCommand({ currentSession }: GlobalCommandProps) {
+function GlobalCommand({ currentSession: _currentSession }: GlobalCommandProps) {
   const [expanded, setExpanded] = useState(false);
   const [command, setCommand] = useState('');
 

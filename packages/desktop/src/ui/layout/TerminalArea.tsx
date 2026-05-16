@@ -3,7 +3,6 @@
  */
 
 import { useRef, useEffect, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
@@ -27,7 +26,7 @@ interface TerminalAreaProps {
 /**
  * 终端区组件
  */
-function TerminalArea({ sessionCollapsed, toolCollapsed, currentSession }: TerminalAreaProps) {
+function TerminalArea({ currentSession }: TerminalAreaProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const [terminal, setTerminal] = useState<Terminal | null>(null);
   const [commandEditorCollapsed, setCommandEditorCollapsed] = useState(true);
@@ -83,6 +82,7 @@ function TerminalArea({ sessionCollapsed, toolCollapsed, currentSession }: Termi
     terminal?.writeln(`\x1b[1;32m>\x1b[0m ${command}`);
 
     try {
+      const { invoke } = await import('@tauri-apps/api/core');
       const result = await invoke<string>('execute_command', {
         sessionId: currentSession.id,
         command,

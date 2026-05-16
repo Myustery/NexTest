@@ -18,7 +18,7 @@ function App() {
     // 初始化 Tauri 插件
     const initTauri = async () => {
       try {
-        const { invoke } = await import('@tauri-apps/api/core');
+        await import('@tauri-apps/api/core');
         console.log('Tauri API 已加载');
       } catch (error) {
         console.warn('Tauri API 不可用，可能在 Web 模式下运行');
