@@ -36,7 +36,7 @@ interface UseCommandReturn {
  * 
  * 管理命令的执行流程
  */
-export function useCommand(options: UseCommandOptions = {}): UseCommandReturn {
+export function useCommand(_options: UseCommandOptions = {}): UseCommandReturn {
   const [status, setStatus] = useState<ExecutionStatus>('idle');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [totalCommands, setTotalCommands] = useState(0);

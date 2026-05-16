@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  nextest-server:
+    build:
+      context: ../..
+      dockerfile: packages/server/Dockerfile
+    container_name: nextest-server
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - nextest-data:/app/data
+    environment:
+      - DATABASE_URL=sqlite:/app/data/nextest.db
+      - RUST_LOG=info
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  nextest-data:
+    driver: local

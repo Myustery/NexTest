@@ -21,7 +21,7 @@ interface TerminalAreaProps {
  * 
  * 自适应宽度，最小宽度 400px
  */
-function TerminalArea({ sessionCollapsed, toolCollapsed }: TerminalAreaProps) {
+function TerminalArea({ sessionCollapsed: _sessionCollapsed, toolCollapsed: _toolCollapsed }: TerminalAreaProps) {
   // 命令编辑区是否折叠
   const [commandEditorCollapsed, setCommandEditorCollapsed] = useState(true);
 

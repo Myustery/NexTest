@@ -8,8 +8,6 @@
  * - 右键新建文件夹/会话
  */
 
-import { useState } from 'react';
-
 interface SessionPanelProps {
   /** 是否折叠 */
   collapsed: boolean;

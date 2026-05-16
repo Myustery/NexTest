@@ -8,8 +8,6 @@
  * - 展开时推开终端区
  */
 
-import { useState } from 'react';
-
 interface ToolSidebarProps {
   /** 是否折叠 */
   collapsed: boolean;

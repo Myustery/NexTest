@@ -19,10 +19,14 @@ interface Announcement {
 function AdminAnnouncements() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newAnnouncement, setNewAnnouncement] = useState({
+  const [newAnnouncement, setNewAnnouncement] = useState<{
+    title: string;
+    content: string;
+    type: 'info' | 'warning' | 'urgent';
+  }>({
     title: '',
     content: '',
-    type: 'info' as const,
+    type: 'info',
   });
 
   useEffect(() => {
@@ -179,12 +183,12 @@ function AdminAnnouncements() {
                 <label className="mb-1 block text-sm text-gray-400">类型</label>
                 <select
                   value={newAnnouncement.type}
-                  onChange={(e) =>
-                    setNewAnnouncement({
-                      ...newAnnouncement,
-                      type: e.target.value as 'info' | 'warning' | 'urgent',
-                    })
-                  }
+                onChange={(e) =>
+                  setNewAnnouncement({
+                    ...newAnnouncement,
+                    type: e.target.value as 'info' | 'warning' | 'urgent',
+                  })
+                }
                   className="w-full rounded border border-[var(--color-border)] bg-[#1e1e1e] px-3 py-2 text-white"
                 >
                   <option value="info">通知</option>
