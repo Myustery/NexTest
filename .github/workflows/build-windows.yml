@@ -55,11 +55,10 @@ jobs:
       - name: 安装前端依赖
         run: pnpm install
 
-      - name: 构建前端
-        run: pnpm --filter @nextest/desktop build
-
       - name: 构建 Tauri 应用（便携版）
-        run: cargo build --release -p nextest-desktop
+        run: |
+          cd packages/desktop
+          pnpm tauri build --no-bundle
         env:
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
@@ -68,7 +67,7 @@ jobs:
         run: |
           Write-Host "=== 根目录 target/release ==="
           Get-ChildItem -Path "target/release" -Filter "*.exe" -ErrorAction SilentlyContinue
-          Write-Host "=== packages/desktop target/release ==="
+          Write-Host "=== packages/desktop/src-tauri/target/release ==="
           Get-ChildItem -Path "packages/desktop/src-tauri/target/release" -Filter "*.exe" -ErrorAction SilentlyContinue
           Write-Host "=== 搜索所有 exe 文件 ==="
           Get-ChildItem -Path "." -Filter "*.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
@@ -83,10 +82,10 @@ jobs:
           $exePath = ""
           if (Test-Path "target/release/NexTest.exe") {
             $exePath = "target/release/NexTest.exe"
-          } elseif (Test-Path "target/release/nextest-desktop.exe") {
-            $exePath = "target/release/nextest-desktop.exe"
           } elseif (Test-Path "packages/desktop/src-tauri/target/release/NexTest.exe") {
             $exePath = "packages/desktop/src-tauri/target/release/NexTest.exe"
+          } elseif (Test-Path "target/release/nextest-desktop.exe") {
+            $exePath = "target/release/nextest-desktop.exe"
           } elseif (Test-Path "packages/desktop/src-tauri/target/release/nextest-desktop.exe") {
             $exePath = "packages/desktop/src-tauri/target/release/nextest-desktop.exe"
           }
