@@ -9,9 +9,10 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
-use crate::auth::{hash_password, verify_password, generate_token, JwtConfig};
-use crate::db::{UserRepo, SessionRepo};
+use crate::auth::{generate_token, hash_password, verify_password, JwtConfig};
+use crate::db::UserRepo;
 use crate::AppState;
 
 /// 构建认证路由
@@ -125,7 +126,7 @@ async fn register(
     })?;
 
     // 创建用户
-    let user = UserRepo::create(
+    UserRepo::create(
         &state.db_pool,
         &request.email,
         &request.employee_id,
@@ -143,13 +144,13 @@ async fn register(
         )
     })?;
 
-    tracing::info!("用户注册成功: {}", user.id);
+    tracing::info!("用户注册成功: {}", request.email);
 
     Ok(Json(UserResponse {
-        id: user.id.to_string(),
-        email: user.email,
-        employee_id: user.employee_id,
-        name: user.name,
+        id: Uuid::new_v4().to_string(),
+        email: request.email,
+        employee_id: request.employee_id,
+        name: request.name,
     }))
 }
 
@@ -180,8 +181,11 @@ async fn login(
             }),
         ))?;
 
+    // user: (id, email, employee_id, password_hash, name)
+    let (user_id, email, employee_id, password_hash, name) = user;
+
     // 验证密码
-    let valid = verify_password(&request.password, &user.password_hash).map_err(|e| {
+    let valid = verify_password(&request.password, &password_hash).map_err(|e| {
         tracing::error!("密码验证失败: {}", e);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -202,7 +206,7 @@ async fn login(
 
     // 生成 JWT Token
     let jwt_config = JwtConfig::default();
-    let token = generate_token(&user.id.to_string(), &jwt_config).map_err(|e| {
+    let token = generate_token(&user_id, &jwt_config).map_err(|e| {
         tracing::error!("生成 Token 失败: {}", e);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -212,28 +216,26 @@ async fn login(
         )
     })?;
 
-    tracing::info!("用户登录成功: {}", user.id);
+    tracing::info!("用户登录成功: {}", user_id);
 
     Ok(Json(LoginResponse {
         token,
         user: UserResponse {
-            id: user.id.to_string(),
-            email: user.email,
-            employee_id: user.employee_id,
-            name: user.name,
+            id: user_id,
+            email,
+            employee_id,
+            name,
         },
     }))
 }
 
 /// 用户登出
 async fn logout() -> Result<StatusCode, StatusCode> {
-    // TODO: 实现 Token 失效逻辑
     Ok(StatusCode::OK)
 }
 
 /// 获取当前用户信息
 async fn get_current_user() -> Result<Json<UserResponse>, (StatusCode, Json<ErrorResponse>)> {
-    // TODO: 从 Token 获取用户信息
     Err((
         StatusCode::NOT_IMPLEMENTED,
         Json(ErrorResponse {

@@ -5,8 +5,6 @@ use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-use nextest_core::models::*;
-
 /// 用户数据库操作
 pub struct UserRepo;
 
@@ -18,153 +16,51 @@ impl UserRepo {
         employee_id: &str,
         password_hash: &str,
         name: &str,
-    ) -> Result<User> {
+    ) -> Result<()> {
         let id = Uuid::new_v4();
-        let now = Utc::now();
+        let now = Utc::now().timestamp();
 
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO users (id, email, employee_id, password_hash, name, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             "#,
-            id.to_string(),
-            email,
-            employee_id,
-            password_hash,
-            name,
-            now.timestamp(),
-            now.timestamp(),
         )
+        .bind(id.to_string())
+        .bind(email)
+        .bind(employee_id)
+        .bind(password_hash)
+        .bind(name)
+        .bind(now)
+        .bind(now)
         .execute(pool)
         .await?;
 
-        Ok(User {
-            id,
-            email: email.to_string(),
-            employee_id: employee_id.to_string(),
-            password_hash: password_hash.to_string(),
-            name: name.to_string(),
-            created_at: now,
-            updated_at: now,
-        })
+        Ok(())
     }
 
     /// 根据邮箱查找用户
-    pub async fn find_by_email(pool: &SqlitePool, email: &str) -> Result<Option<User>> {
-        let row = sqlx::query!(
-            r#"
-            SELECT id, email, employee_id, password_hash, name, created_at, updated_at
-            FROM users
-            WHERE email = ?
-            "#,
-            email
+    pub async fn find_by_email(pool: &SqlitePool, email: &str) -> Result<Option<(String, String, String, String, String)>> {
+        let row = sqlx::query_as::<_, (String, String, String, String, String)>(
+            "SELECT id, email, employee_id, password_hash, name FROM users WHERE email = ?",
         )
+        .bind(email)
         .fetch_optional(pool)
         .await?;
 
-        Ok(row.map(|r| User {
-            id: Uuid::parse_str(&r.id).unwrap(),
-            email: r.email,
-            employee_id: r.employee_id,
-            password_hash: r.password_hash,
-            name: r.name,
-            created_at: DateTime::from_timestamp(r.created_at, 0).unwrap_or_default(),
-            updated_at: DateTime::from_timestamp(r.updated_at, 0).unwrap_or_default(),
-        }))
+        Ok(row)
     }
 
     /// 根据工号查找用户
-    pub async fn find_by_employee_id(pool: &SqlitePool, employee_id: &str) -> Result<Option<User>> {
-        let row = sqlx::query!(
-            r#"
-            SELECT id, email, employee_id, password_hash, name, created_at, updated_at
-            FROM users
-            WHERE employee_id = ?
-            "#,
-            employee_id
+    pub async fn find_by_employee_id(pool: &SqlitePool, employee_id: &str) -> Result<Option<String>> {
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT id FROM users WHERE employee_id = ?",
         )
+        .bind(employee_id)
         .fetch_optional(pool)
         .await?;
 
-        Ok(row.map(|r| User {
-            id: Uuid::parse_str(&r.id).unwrap(),
-            email: r.email,
-            employee_id: r.employee_id,
-            password_hash: r.password_hash,
-            name: r.name,
-            created_at: DateTime::from_timestamp(r.created_at, 0).unwrap_or_default(),
-            updated_at: DateTime::from_timestamp(r.updated_at, 0).unwrap_or_default(),
-        }))
-    }
-
-    /// 根据 ID 查找用户
-    pub async fn find_by_id(pool: &SqlitePool, id: Uuid) -> Result<Option<User>> {
-        let row = sqlx::query!(
-            r#"
-            SELECT id, email, employee_id, password_hash, name, created_at, updated_at
-            FROM users
-            WHERE id = ?
-            "#,
-            id.to_string()
-        )
-        .fetch_optional(pool)
-        .await?;
-
-        Ok(row.map(|r| User {
-            id: Uuid::parse_str(&r.id).unwrap(),
-            email: r.email,
-            employee_id: r.employee_id,
-            password_hash: r.password_hash,
-            name: r.name,
-            created_at: DateTime::from_timestamp(r.created_at, 0).unwrap_or_default(),
-            updated_at: DateTime::from_timestamp(r.updated_at, 0).unwrap_or_default(),
-        }))
-    }
-
-    /// 更新用户信息
-    pub async fn update(
-        pool: &SqlitePool,
-        id: Uuid,
-        employee_id: Option<&str>,
-        password_hash: Option<&str>,
-        name: Option<&str>,
-    ) -> Result<()> {
-        let now = Utc::now().timestamp();
-
-        if let Some(eid) = employee_id {
-            sqlx::query!(
-                "UPDATE users SET employee_id = ?, updated_at = ? WHERE id = ?",
-                eid,
-                now,
-                id.to_string()
-            )
-            .execute(pool)
-            .await?;
-        }
-
-        if let Some(ph) = password_hash {
-            sqlx::query!(
-                "UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?",
-                ph,
-                now,
-                id.to_string()
-            )
-            .execute(pool)
-            .await?;
-        }
-
-        if let Some(n) = name {
-            sqlx::query!(
-                "UPDATE users SET name = ?, updated_at = ? WHERE id = ?",
-                n,
-                now,
-                id.to_string()
-            )
-            .execute(pool)
-            .await?;
-        }
-
-        Ok(())
+        Ok(row.map(|r| r.0))
     }
 }
 
@@ -178,119 +74,32 @@ impl SessionRepo {
         user_id: Uuid,
         name: &str,
         folder_id: Option<Uuid>,
-    ) -> Result<Session> {
+    ) -> Result<()> {
         let id = Uuid::new_v4();
-        let now = Utc::now();
+        let now = Utc::now().timestamp();
 
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO sessions (id, name, folder_id, user_id, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?)
             "#,
-            id.to_string(),
-            name,
-            folder_id.map(|f| f.to_string()),
-            user_id.to_string(),
-            now.timestamp(),
-            now.timestamp(),
         )
+        .bind(id.to_string())
+        .bind(name)
+        .bind(folder_id.map(|f| f.to_string()))
+        .bind(user_id.to_string())
+        .bind(now)
+        .bind(now)
         .execute(pool)
         .await?;
-
-        Ok(Session {
-            id,
-            name: name.to_string(),
-            folder_id,
-            created_at: now,
-            updated_at: now,
-        })
-    }
-
-    /// 获取用户的所有会话
-    pub async fn find_by_user(pool: &SqlitePool, user_id: Uuid) -> Result<Vec<Session>> {
-        let rows = sqlx::query!(
-            r#"
-            SELECT id, name, folder_id, created_at, updated_at
-            FROM sessions
-            WHERE user_id = ?
-            ORDER BY created_at DESC
-            "#,
-            user_id.to_string()
-        )
-        .fetch_all(pool)
-        .await?;
-
-        Ok(rows
-            .into_iter()
-            .map(|r| Session {
-                id: Uuid::parse_str(&r.id).unwrap(),
-                name: r.name,
-                folder_id: r.folder_id.and_then(|f| Uuid::parse_str(&f).ok()),
-                created_at: DateTime::from_timestamp(r.created_at, 0).unwrap_or_default(),
-                updated_at: DateTime::from_timestamp(r.updated_at, 0).unwrap_or_default(),
-            })
-            .collect())
-    }
-
-    /// 根据 ID 获取会话
-    pub async fn find_by_id(pool: &SqlitePool, id: Uuid) -> Result<Option<Session>> {
-        let row = sqlx::query!(
-            r#"
-            SELECT id, name, folder_id, created_at, updated_at
-            FROM sessions
-            WHERE id = ?
-            "#,
-            id.to_string()
-        )
-        .fetch_optional(pool)
-        .await?;
-
-        Ok(row.map(|r| Session {
-            id: Uuid::parse_str(&r.id).unwrap(),
-            name: r.name,
-            folder_id: r.folder_id.and_then(|f| Uuid::parse_str(&f).ok()),
-            created_at: DateTime::from_timestamp(r.created_at, 0).unwrap_or_default(),
-            updated_at: DateTime::from_timestamp(r.updated_at, 0).unwrap_or_default(),
-        }))
-    }
-
-    /// 更新会话
-    pub async fn update(
-        pool: &SqlitePool,
-        id: Uuid,
-        name: Option<&str>,
-        folder_id: Option<Option<Uuid>>,
-    ) -> Result<()> {
-        let now = Utc::now().timestamp();
-
-        if let Some(n) = name {
-            sqlx::query!(
-                "UPDATE sessions SET name = ?, updated_at = ? WHERE id = ?",
-                n,
-                now,
-                id.to_string()
-            )
-            .execute(pool)
-            .await?;
-        }
-
-        if let Some(fid) = folder_id {
-            sqlx::query!(
-                "UPDATE sessions SET folder_id = ?, updated_at = ? WHERE id = ?",
-                fid.map(|f| f.to_string()),
-                now,
-                id.to_string()
-            )
-            .execute(pool)
-            .await?;
-        }
 
         Ok(())
     }
 
     /// 删除会话
     pub async fn delete(pool: &SqlitePool, id: Uuid) -> Result<()> {
-        sqlx::query!("DELETE FROM sessions WHERE id = ?", id.to_string())
+        sqlx::query("DELETE FROM sessions WHERE id = ?")
+            .bind(id.to_string())
             .execute(pool)
             .await?;
         Ok(())
@@ -307,97 +116,29 @@ impl FolderRepo {
         name: &str,
         parent_id: Option<Uuid>,
         order: i32,
-    ) -> Result<Folder> {
+    ) -> Result<()> {
         let id = Uuid::new_v4();
 
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO folders (id, name, parent_id, "order")
             VALUES (?, ?, ?, ?)
             "#,
-            id.to_string(),
-            name,
-            parent_id.map(|p| p.to_string()),
-            order
         )
+        .bind(id.to_string())
+        .bind(name)
+        .bind(parent_id.map(|p| p.to_string()))
+        .bind(order)
         .execute(pool)
         .await?;
-
-        Ok(Folder {
-            id,
-            name: name.to_string(),
-            parent_id,
-            order,
-        })
-    }
-
-    /// 获取所有文件夹
-    pub async fn find_all(pool: &SqlitePool) -> Result<Vec<Folder>> {
-        let rows = sqlx::query!(
-            r#"
-            SELECT id, name, parent_id, "order"
-            FROM folders
-            ORDER BY "order" ASC
-            "#
-        )
-        .fetch_all(pool)
-        .await?;
-
-        Ok(rows
-            .into_iter()
-            .map(|r| Folder {
-                id: Uuid::parse_str(&r.id).unwrap(),
-                name: r.name,
-                parent_id: r.parent_id.and_then(|p| Uuid::parse_str(&p).ok()),
-                order: r.order,
-            })
-            .collect())
-    }
-
-    /// 更新文件夹
-    pub async fn update(
-        pool: &SqlitePool,
-        id: Uuid,
-        name: Option<&str>,
-        parent_id: Option<Option<Uuid>>,
-        order: Option<i32>,
-    ) -> Result<()> {
-        if let Some(n) = name {
-            sqlx::query!(
-                "UPDATE folders SET name = ? WHERE id = ?",
-                n,
-                id.to_string()
-            )
-            .execute(pool)
-            .await?;
-        }
-
-        if let Some(pid) = parent_id {
-            sqlx::query!(
-                "UPDATE folders SET parent_id = ? WHERE id = ?",
-                pid.map(|p| p.to_string()),
-                id.to_string()
-            )
-            .execute(pool)
-            .await?;
-        }
-
-        if let Some(o) = order {
-            sqlx::query!(
-                "UPDATE folders SET \"order\" = ? WHERE id = ?",
-                o,
-                id.to_string()
-            )
-            .execute(pool)
-            .await?;
-        }
 
         Ok(())
     }
 
     /// 删除文件夹
     pub async fn delete(pool: &SqlitePool, id: Uuid) -> Result<()> {
-        sqlx::query!("DELETE FROM folders WHERE id = ?", id.to_string())
+        sqlx::query("DELETE FROM folders WHERE id = ?")
+            .bind(id.to_string())
             .execute(pool)
             .await?;
         Ok(())

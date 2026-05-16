@@ -12,14 +12,15 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::{
-    routing::{get, post},
+    routing::get,
     Router,
 };
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::APP_NAME;
+/// 应用名称常量
+const APP_NAME: &str = "NexTest";
 
 /// 应用状态
 #[derive(Debug, Clone)]
@@ -30,7 +31,7 @@ pub struct AppState {
 
 /// 启动服务器
 #[tokio::main]
-pub async fn run() -> anyhow::Result<()> {
+async fn main() -> anyhow::Result<()> {
     // 初始化日志
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
