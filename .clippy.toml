@@ -1,0 +1,20 @@
+msrv = "1.78.0"
+avoid-breaking-exported-api = true
+disallowed-methods = [
+    { path = "std::env::temp_dir", reason = "使用 tempdir crate 更安全" }
+]
+blacklisted-names = [
+    "foo",
+    "bar",
+    "baz",
+    "quux"
+]
+doc-valid-idents-codegen = true
+missing-docs-in-crate-items = true
+default-enum-variant-name = "Default"
+default-trait-method-argument-names = ["_self", "_rhs", "_other"]
+allow-one-hash-in-raw-comments = true
+standard-macro-braces = [
+    { name = "quote", brace = "Square" },
+    { name = "vec!", brace = "Square" }
+]

@@ -1,0 +1,78 @@
+# 测试工作流
+
+name: Test
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  test-rust:
+    name: Rust 单元测试
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: 缓存 Rust 依赖
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            packages/core
+            packages/server
+
+      - name: 检查代码格式
+        run: cargo fmt --all --check
+
+      - name: 运行 Clippy 检查
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: 运行单元测试
+        run: cargo test --all
+
+  test-web:
+    name: 前端测试
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: 安装依赖
+        run: pnpm install
+
+      - name: 运行 ESLint 检查
+        run: pnpm --filter @nextest/web lint
+
+      - name: 运行 TypeScript 类型检查
+        run: pnpm --filter @nextest/web type-check
+
+      - name: 运行单元测试
+        run: pnpm --filter @nextest/web test

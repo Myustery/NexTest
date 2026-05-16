@@ -1,0 +1,30 @@
+{
+  "name": "nextest",
+  "version": "0.1.0",
+  "description": "NexTest - 跨平台终端工具，支持桌面端和Web端",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @nextest/web dev",
+    "dev:desktop": "pnpm --filter @nextest/desktop dev",
+    "build": "pnpm -r build",
+    "build:web": "pnpm --filter @nextest/web build",
+    "build:desktop": "pnpm --filter @nextest/desktop build",
+    "lint": "pnpm -r lint",
+    "format": "pnpm -r format",
+    "test": "pnpm -r test",
+    "clean": "pnpm -r clean"
+  },
+  "keywords": [
+    "terminal",
+    "shell",
+    "tauri",
+    "web"
+  ],
+  "author": "NexTest Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

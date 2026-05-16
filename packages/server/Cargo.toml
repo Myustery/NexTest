@@ -1,0 +1,37 @@
+[package]
+name = "nextest-server"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "NexTest 后端服务"
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+
+# Web 框架
+axum = { version = "0.7", features = ["ws", "macros"] }
+tower = { version = "0.4", features = ["util"] }
+tower-http = { version = "0.5", features = ["fs", "cors", "trace"] }
+
+# 数据库
+sqlx = { version = "0.7", features = ["runtime-tokio", "sqlite", "chrono", "uuid"] }
+
+# 认证
+jsonwebtoken = "0.12"
+argon2 = "0.5"
+
+# WebSocket
+futures-util = "0.3"
+
+[dev-dependencies]
+reqwest = { version = "0.12", features = ["json"] }

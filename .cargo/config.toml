@@ -1,0 +1,2 @@
+# Rust 工作空间 Cargo.lock 文件统一管理
+inherit-workspace-config = true
