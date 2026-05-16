@@ -41,16 +41,8 @@ fn main() {
         // 注册插件
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(
-            tauri_plugin_sql::Builder::default()
-                .build()
-                .expect("SQL 插件初始化失败"),
-        )
-        .plugin(
-            tauri_plugin_updater::Builder::new()
-                .build()
-                .expect("Updater 插件初始化失败"),
-        )
+        .plugin(tauri_plugin_sql::Builder::default().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         // 单实例检查
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
