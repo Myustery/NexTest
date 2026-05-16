@@ -12,6 +12,9 @@ pub mod shortcut;
 pub mod sync_event;
 pub mod version;
 
+#[cfg(test)]
+mod tests;
+
 pub use user::*;
 pub use session::*;
 pub use folder::*;

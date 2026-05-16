@@ -2,7 +2,6 @@
 
 use anyhow::Result;
 use std::process::Command;
-use std::io::{self, Write};
 
 use crate::models::SyntaxType;
 use super::parser::CommandParser;
@@ -19,7 +18,7 @@ pub struct CommandExecutor {
 }
 
 /// 执行结果
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExecutionResult {
     /// 是否成功
     pub success: bool,

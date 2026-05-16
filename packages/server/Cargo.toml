@@ -24,10 +24,10 @@ tower = { version = "0.4", features = ["util"] }
 tower-http = { version = "0.5", features = ["fs", "cors", "trace"] }
 
 # 数据库
-sqlx = { version = "0.7", features = ["runtime-tokio", "sqlite", "chrono", "uuid"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "chrono", "uuid"] }
 
 # 认证
-jsonwebtoken = "0.12"
+jsonwebtoken = "10"
 argon2 = "0.5"
 
 # WebSocket
@@ -35,3 +35,6 @@ futures-util = "0.3"
 
 [dev-dependencies]
 reqwest = { version = "0.12", features = ["json"] }
+
+# 内部依赖
+nextest-core = { path = "../core" }

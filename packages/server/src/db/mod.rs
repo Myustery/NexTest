@@ -1,6 +1,9 @@
 //! 数据库模块
 
 pub mod migrations;
+pub mod repo;
+
+pub use repo::*;
 
 use anyhow::Result;
 use sqlx::SqlitePool;
