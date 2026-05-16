@@ -41,14 +41,21 @@ fn main() {
         // 注册插件
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_sql::Builder::default().build())
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(
+            tauri_plugin_sql::Builder::default()
+                .build()
+                .expect("SQL 插件初始化失败"),
+        )
+        .plugin(
+            tauri_plugin_updater::Builder::new()
+                .build()
+                .expect("Updater 插件初始化失败"),
+        )
         // 单实例检查
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            let _ = app
-                .get_webview_window("main")
-                .expect("找不到主窗口")
-                .set_focus();
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_focus();
+            }
         }))
         // 注册命令
         .invoke_handler(tauri::generate_handler![
@@ -62,14 +69,20 @@ fn main() {
         .manage(state)
         // 设置系统托盘
         .setup(|app| {
+            tracing::info!("应用 setup 开始");
+            
             #[cfg(debug_assertions)]
             {
-                let window = app.get_webview_window("main").unwrap();
-                window.open_devtools();
+                if let Some(window) = app.get_webview_window("main") {
+                    window.open_devtools();
+                }
             }
 
+            tracing::info!("应用 setup 完成");
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("Tauri 运行失败");
+        .unwrap_or_else(|e| {
+            eprintln!("Tauri 运行失败: {}", e);
+        });
 }
