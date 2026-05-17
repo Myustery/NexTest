@@ -85,6 +85,12 @@ function TerminalArea({
   const resizeStartHeight = useRef<number>(0);
 
   const createTerminal = useCallback((sessionId: string) => {
+    const existing = terminals.get(sessionId);
+    if (existing) {
+      log.debug(`终端已存在，返回缓存 | sessionId=${sessionId}`);
+      return { term: existing.term, fit: existing.fit };
+    }
+    
     log.info(`创建终端实例 | sessionId=${sessionId}`);
     
     const term = new Terminal({
@@ -143,9 +149,8 @@ function TerminalArea({
       return;
     }
 
-    containerRef.current.innerHTML = '';
-
     let terminalData = terminals.get(sessionId);
+    
     if (!terminalData) {
       log.debug(`终端不存在，创建新终端 | sessionId=${sessionId}`);
       terminalData = createTerminal(sessionId);
@@ -154,6 +159,7 @@ function TerminalArea({
     const { term, fit } = terminalData;
 
     if (!term.element) {
+      containerRef.current.innerHTML = '';
       log.debug(`打开终端 | sessionId=${sessionId}`);
       term.open(containerRef.current);
     }
