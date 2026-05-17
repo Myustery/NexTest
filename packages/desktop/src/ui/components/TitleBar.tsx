@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 interface TitleBarProps {
   title?: string;
@@ -14,70 +14,106 @@ function TitleBar({
   onToggleCommandBar,
 }: TitleBarProps) {
   const [isMaximized, setIsMaximized] = useState(false);
-  const [windowApi, setWindowApi] = useState<{
+  const windowRef = useRef<{
     minimize: () => Promise<void>;
     toggleMaximize: () => Promise<void>;
-    isMaximized: () => Promise<boolean>;
     close: () => Promise<void>;
+    isMaximized: () => Promise<boolean>;
   } | null>(null);
 
   useEffect(() => {
+    // 初始化窗口 API
     const initWindow = async () => {
       try {
         const { getCurrentWindow } = await import('@tauri-apps/api/window');
         const win = getCurrentWindow();
         
-        setWindowApi({
+        windowRef.current = {
           minimize: () => win.minimize(),
           toggleMaximize: () => win.toggleMaximize(),
-          isMaximized: () => win.isMaximized(),
           close: () => win.close(),
-        });
+          isMaximized: () => win.isMaximized(),
+        };
         
-        setIsMaximized(await win.isMaximized());
+        // 获取初始状态
+        const maximized = await win.isMaximized();
+        setIsMaximized(maximized);
         
-        const unlisten = win.onResized(async () => {
-          setIsMaximized(await win.isMaximized());
-        });
-        
-        return unlisten;
-      } catch (error) {
-        console.error('初始化窗口 API 失败:', error);
+        console.log('[TitleBar] 窗口 API 初始化成功');
+      } catch (err) {
+        console.error('[TitleBar] 窗口 API 初始化失败:', err);
       }
     };
     
     initWindow();
   }, []);
 
-  const handleMinimize = async () => {
-    if (windowApi) {
+  const handleMinimize = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('[TitleBar] 点击最小化');
+    
+    if (windowRef.current) {
       try {
-        await windowApi.minimize();
-      } catch (error) {
-        console.error('最小化失败:', error);
+        await windowRef.current.minimize();
+        console.log('[TitleBar] 最小化成功');
+      } catch (err) {
+        console.error('[TitleBar] 最小化失败:', err);
       }
     }
   };
 
-  const handleMaximize = async () => {
-    if (windowApi) {
+  const handleMaximize = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('[TitleBar] 点击最大化/还原');
+    
+    if (windowRef.current) {
       try {
-        await windowApi.toggleMaximize();
-        setIsMaximized(await windowApi.isMaximized());
-      } catch (error) {
-        console.error('最大化失败:', error);
+        await windowRef.current.toggleMaximize();
+        const maximized = await windowRef.current.isMaximized();
+        setIsMaximized(maximized);
+        console.log('[TitleBar] 最大化状态:', maximized);
+      } catch (err) {
+        console.error('[TitleBar] 最大化失败:', err);
       }
     }
   };
 
-  const handleClose = async () => {
-    if (windowApi) {
+  const handleClose = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('[TitleBar] 点击关闭');
+    
+    if (windowRef.current) {
       try {
-        await windowApi.close();
-      } catch (error) {
-        console.error('关闭失败:', error);
+        await windowRef.current.close();
+        console.log('[TitleBar] 关闭成功');
+      } catch (err) {
+        console.error('[TitleBar] 关闭失败:', err);
       }
     }
+  };
+
+  const handleNewSession = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('[TitleBar] 点击新建终端');
+    onNewSession?.();
+  };
+
+  const handleToggleTool = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('[TitleBar] 点击切换工具栏');
+    onToggleToolSidebar?.();
+  };
+
+  const handleToggleCommand = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('[TitleBar] 点击切换命令栏');
+    onToggleCommandBar?.();
   };
 
   return (
@@ -85,25 +121,26 @@ function TitleBar({
       className="flex h-[32px] items-center justify-between bg-[var(--color-bg-elevated)] border-b border-[var(--color-border-subtle)] select-none"
       data-tauri-drag-region
     >
-      <div className="flex items-center h-full px-3" data-tauri-drag-region>
-        <div className="flex items-center gap-2">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[var(--color-primary)]">
-            <polyline points="4,17 10,11 4,5"/>
-            <line x1="12" y1="19" x2="20" y2="19"/>
-          </svg>
-          <span className="text-sm font-medium text-[var(--color-fg)]">{title}</span>
-        </div>
+      {/* 左侧：Logo 和标题 */}
+      <div 
+        className="flex items-center h-full px-3"
+        data-tauri-drag-region
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[var(--color-primary)]">
+          <polyline points="4,17 10,11 4,5"/>
+          <line x1="12" y1="19" x2="20" y2="19"/>
+        </svg>
+        <span className="ml-2 text-sm font-medium text-[var(--color-fg)]">{title}</span>
       </div>
 
-      <div className="flex items-center h-full" data-tauri-drag-region>
-        <div className="flex items-center gap-1 px-2 mr-2">
+      {/* 右侧：工具按钮和窗口控制 */}
+      <div className="flex items-center h-full" data-tauri-drag-region="false">
+        {/* 工具按钮 */}
+        <div className="flex items-center gap-1 px-2">
           <button 
-            className="toolbar-btn" 
-            title="新建终端 (Ctrl+Shift+`)"
-            onClick={(e) => {
-              e.stopPropagation();
-              onNewSession?.();
-            }}
+            className="toolbar-btn"
+            title="新建终端"
+            onClick={handleNewSession}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="12" y1="5" x2="12" y2="19"/>
@@ -111,12 +148,9 @@ function TitleBar({
             </svg>
           </button>
           <button 
-            className="toolbar-btn" 
-            title="命令工具栏"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleToolSidebar?.();
-            }}
+            className="toolbar-btn"
+            title="工具栏"
+            onClick={handleToggleTool}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -124,30 +158,23 @@ function TitleBar({
             </svg>
           </button>
           <button 
-            className="toolbar-btn" 
-            title="全局命令栏"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleCommandBar?.();
-            }}
+            className="toolbar-btn"
+            title="命令栏"
+            onClick={handleToggleCommand}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="3" width="18" height="18" rx="2"/>
               <line x1="3" y1="15" x2="21" y2="15"/>
             </svg>
           </button>
-          <button className="toolbar-btn" title="设置">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33"/>
-            </svg>
-          </button>
         </div>
 
+        {/* 窗口控制按钮 */}
         <div className="flex items-center h-full windows-controls">
           <button
             className="window-btn minimize"
             onClick={handleMinimize}
+            onMouseDown={(e) => e.stopPropagation()}
             title="最小化"
           >
             <svg width="10" height="1" viewBox="0 0 10 1">
@@ -157,6 +184,7 @@ function TitleBar({
           <button
             className="window-btn maximize"
             onClick={handleMaximize}
+            onMouseDown={(e) => e.stopPropagation()}
             title={isMaximized ? '还原' : '最大化'}
           >
             {isMaximized ? (
@@ -173,6 +201,7 @@ function TitleBar({
           <button
             className="window-btn close"
             onClick={handleClose}
+            onMouseDown={(e) => e.stopPropagation()}
             title="关闭"
           >
             <svg width="10" height="10" viewBox="0 0 10 10">

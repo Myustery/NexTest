@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
-import { Terminal } from '@xterm/xterm';
+import { Terminal, IDisposable } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
@@ -63,7 +63,7 @@ const TERMINAL_THEME = {
   brightWhite: '#e5e5e5',
 };
 
-const terminals = new Map<string, { term: Terminal; fit: FitAddon }>();
+const terminals = new Map<string, { term: Terminal; fit: FitAddon; dataListener?: IDisposable; resizeListener?: IDisposable }>();
 
 function TerminalArea({
   currentSession,
@@ -76,6 +76,13 @@ function TerminalArea({
   const [searchTerm, setSearchTerm] = useState('');
   const readIntervalRef = useRef<number | null>(null);
   const { showMenu } = useContextMenu();
+  
+  const [commandEditExpanded, setCommandEditExpanded] = useState(true);
+  const [commandEditHeight, setCommandEditHeight] = useState(120);
+  const [commandText, setCommandText] = useState('');
+  const [isRunning, setIsRunning] = useState(false);
+  const resizeStartY = useRef<number | null>(null);
+  const resizeStartHeight = useRef<number>(0);
 
   const createTerminal = useCallback((sessionId: string) => {
     log.info(`创建终端实例 | sessionId=${sessionId}`);
@@ -101,7 +108,28 @@ function TerminalArea({
     term.loadAddon(fit);
     term.loadAddon(links);
 
-    terminals.set(sessionId, { term, fit });
+    const dataListener = term.onData(async (data) => {
+      log.debug(`终端输入 | sessionId=${sessionId} | len=${data.length} | data=${JSON.stringify(data)}`);
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('write_pty', { sessionId, data });
+        log.debug(`写入 PTY 成功 | sessionId=${sessionId}`);
+      } catch (error) {
+        log.error(`写入 PTY 失败 | sessionId=${sessionId}`, error);
+      }
+    });
+
+    const resizeListener = term.onResize(async ({ cols, rows }) => {
+      log.debug(`终端尺寸变化 | sessionId=${sessionId} | ${cols}x${rows}`);
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('resize_pty', { sessionId, rows, cols });
+      } catch (error) {
+        log.error(`调整 PTY 大小失败 | sessionId=${sessionId}`, error);
+      }
+    });
+
+    terminals.set(sessionId, { term, fit, dataListener, resizeListener });
     log.debug(`终端实例已缓存 | sessionId=${sessionId} | 缓存数量=${terminals.size}`);
 
     return { term, fit };
@@ -133,26 +161,8 @@ function TerminalArea({
     requestAnimationFrame(() => {
       fit.fit();
       log.debug(`终端尺寸调整完成 | sessionId=${sessionId}`);
-    });
-
-    term.onData(async (data) => {
-      log.debug(`终端输入 | sessionId=${sessionId} | len=${data.length}`);
-      try {
-        const { invoke } = await import('@tauri-apps/api/core');
-        await invoke('write_pty', { sessionId, data });
-      } catch (error) {
-        log.error(`写入 PTY 失败 | sessionId=${sessionId}`, error);
-      }
-    });
-
-    term.onResize(async ({ cols, rows }) => {
-      log.debug(`终端尺寸变化 | sessionId=${sessionId} | ${cols}x${rows}`);
-      try {
-        const { invoke } = await import('@tauri-apps/api/core');
-        await invoke('resize_pty', { sessionId, rows, cols });
-      } catch (error) {
-        log.error(`调整 PTY 大小失败 | sessionId=${sessionId}`, error);
-      }
+      term.focus();
+      log.debug(`终端已聚焦 | sessionId=${sessionId}`);
     });
   }, [createTerminal]);
 
@@ -194,8 +204,10 @@ function TerminalArea({
       if (readIntervalRef.current) {
         clearInterval(readIntervalRef.current);
       }
-      terminals.forEach(({ term }, id) => {
+      terminals.forEach(({ term, dataListener, resizeListener }, id) => {
         log.debug(`销毁终端 | sessionId=${id}`);
+        dataListener?.dispose();
+        resizeListener?.dispose();
         term.dispose();
       });
       terminals.clear();
@@ -237,6 +249,47 @@ function TerminalArea({
       window.removeEventListener('resize', handleResize);
     };
   }, [currentSession]);
+
+  const handleCommandRun = useCallback(async () => {
+    if (!currentSession || !commandText.trim()) return;
+    log.info(`执行命令 | sessionId=${currentSession.id} | command=${commandText.trim()}`);
+    setIsRunning(true);
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('execute_command', { sessionId: currentSession.id, command: commandText.trim() });
+    } catch (error) {
+      log.error('执行命令失败', error);
+    } finally {
+      setIsRunning(false);
+    }
+  }, [currentSession, commandText]);
+
+  const handleCommandStop = useCallback(() => {
+    log.info('停止命令执行');
+    setIsRunning(false);
+  }, []);
+
+  const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    resizeStartY.current = e.clientY;
+    resizeStartHeight.current = commandEditHeight;
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (resizeStartY.current !== null) {
+        const delta = resizeStartY.current - moveEvent.clientY;
+        const newHeight = Math.max(60, Math.min(400, resizeStartHeight.current + delta));
+        setCommandEditHeight(newHeight);
+      }
+    };
+    const handleMouseUp = () => {
+      resizeStartY.current = null;
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.classList.remove('dragging');
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.classList.add('dragging');
+  }, [commandEditHeight]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.ctrlKey && e.key === 'f') {
@@ -371,24 +424,29 @@ function TerminalArea({
           {sessions.map((session) => (
             <div
               key={session.id}
-              onClick={() => onSelectSession(session)}
+              onClick={(e) => {
+                if (!(e.target as HTMLElement).closest('.tab-close')) {
+                  onSelectSession(session);
+                }
+              }}
               onContextMenu={(e) => handleTabContextMenu(e, session)}
               className={`tab-item ${currentSession?.id === session.id ? 'active' : ''}`}
             >
               <span className="tab-icon">{getShellIcon(session.shell, session.protocol)}</span>
               <span className="tab-label">{session.name}</span>
-              <button
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  log.info(`Tab 关闭按钮点击 | sessionId=${session.id}`);
-                  onCloseSession(session.id);
-                }}
-                className="tab-close cursor-pointer"
-              >
+               <button
+                 onMouseDown={(e) => {
+                   e.preventDefault();
+                   e.stopPropagation();
+                 }}
+                 onClick={(e) => {
+                   e.preventDefault();
+                   e.stopPropagation();
+                   log.info(`Tab 关闭按钮点击 | sessionId=${session.id}`);
+                   onCloseSession(session.id);
+                 }}
+                 className="tab-close"
+               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <line x1="18" y1="6" x2="6" y2="18"/>
                   <line x1="6" y1="6" x2="18" y2="18"/>
@@ -461,7 +519,63 @@ function TerminalArea({
         data-context-menu
       >
         {currentSession ? (
-          <div ref={containerRef} className="h-full w-full" />
+          <div className="flex flex-col h-full">
+            <div ref={containerRef} className="flex-1 w-full overflow-hidden" />
+            
+            {/* 命令编辑区 */}
+            {commandEditExpanded && (
+              <>
+                <div 
+                  className="resize-handle resize-handle-horizontal h-[3px] cursor-row-resize bg-[var(--color-border-subtle)] hover:bg-[var(--color-primary)]"
+                  onMouseDown={handleResizeMouseDown}
+                />
+                <div 
+                  className="bg-[var(--color-bg-elevated)] border-t border-[var(--color-border-subtle)]"
+                  style={{ height: `${commandEditHeight}px` }}
+                >
+                  {/* Tab 栏 */}
+                  <div className="flex items-center h-[28px] px-2 border-b border-[var(--color-border-subtle)]">
+                    <span className="text-xs text-[var(--color-fg-muted)]">命令编辑</span>
+                    <div className="flex-1" />
+                    <button
+                      className="btn-icon"
+                      onClick={handleCommandRun}
+                      disabled={isRunning || !commandText.trim()}
+                      title="运行 (Enter)"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-[var(--color-success)]">
+                        <polygon points="5,3 19,12 5,21"/>
+                      </svg>
+                    </button>
+                    <button
+                      className="btn-icon"
+                      onClick={handleCommandStop}
+                      disabled={!isRunning}
+                      title="停止"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-[var(--color-error)]">
+                        <rect x="6" y="6" width="12" height="12"/>
+                      </svg>
+                    </button>
+                  </div>
+                  
+                  {/* 编辑区 */}
+                  <textarea
+                    value={commandText}
+                    onChange={(e) => setCommandText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleCommandRun();
+                      }
+                    }}
+                    placeholder="输入命令，按 Enter 执行..."
+                    className="w-full h-[calc(100%-28px)] p-2 bg-transparent border-none outline-none resize-none text-[var(--color-fg)] text-sm font-mono"
+                  />
+                </div>
+              </>
+            )}
+          </div>
         ) : (
           <div className="flex h-full items-center justify-center">
             <div className="text-center animate-fadeIn">
@@ -481,6 +595,29 @@ function TerminalArea({
           </div>
         )}
       </div>
+      
+      {/* 命令编辑区折叠按钮 */}
+      {currentSession && (
+        <div className="flex items-center h-[24px] px-2 bg-[var(--color-bg-elevated)] border-t border-[var(--color-border-subtle)]">
+          <button
+            className="flex items-center gap-1 text-xs text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]"
+            onClick={() => setCommandEditExpanded(!commandEditExpanded)}
+          >
+            <svg 
+              width="12" 
+              height="12" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2"
+              style={{ transform: commandEditExpanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}
+            >
+              <polyline points="9,18 15,12 9,6"/>
+            </svg>
+            <span>{commandEditExpanded ? '隐藏' : '显示'}命令编辑区</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
