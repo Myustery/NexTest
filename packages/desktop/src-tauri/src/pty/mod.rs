@@ -758,8 +758,9 @@ impl ConnectionBackend for SshBackend {
 
     fn set_nonblocking(&mut self, nonblocking: bool) -> std::io::Result<()> {
         if self.nonblocking != nonblocking {
-            tracing::debug!("[SshBackend] 设置非阻塞模式: {}", nonblocking);
-            self.session.set_nonblocking(nonblocking)?;
+            tracing::debug!("[SshBackend] 设置阻塞模式: {}", !nonblocking);
+            // ssh2 使用 set_blocking，参数是 blocking，所以要取反
+            self.session.set_blocking(!nonblocking);
             self.nonblocking = nonblocking;
         }
         Ok(())
