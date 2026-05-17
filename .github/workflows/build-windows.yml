@@ -107,33 +107,77 @@ jobs:
           }
           Write-Host "测试运行: $($exeFile.FullName)"
           
-          # 启动 exe，等待最多 10 秒
+          # 启动 exe，等待初始化
           $process = Start-Process -FilePath $exeFile.FullName -PassThru -WindowStyle Hidden
-          Start-Sleep -Seconds 5
+          Write-Host "进程已启动，PID: $($process.Id)，等待初始化..."
+          Start-Sleep -Seconds 8
           
-          # 检查进程是否还在运行
-          if ($process.HasExited) {
-            $exitCode = $process.ExitCode
-            Write-Host "进程已退出，退出码: $exitCode"
+          # 收集所有日志
+          $logFiles = @("nextest-debug.log", "nextest-startup.log", "nextest-crash.log")
+          $hasError = $false
+          $errorMsg = ""
+          
+          Write-Host "`n========== 日志分析 =========="
+          
+          # 检查 startup 日志
+          if (Test-Path "nextest-startup.log") {
+            Write-Host "`n--- nextest-startup.log ---"
+            $startupLog = Get-Content "nextest-startup.log" -Raw
+            Write-Host $startupLog
+          } else {
+            Write-Host "警告: 未找到 nextest-startup.log"
+            $hasError = $true
+            $errorMsg = "启动日志未生成"
+          }
+          
+          # 检查 debug 日志
+          if (Test-Path "nextest-debug.log") {
+            Write-Host "`n--- nextest-debug.log ---"
+            $debugLog = Get-Content "nextest-debug.log" -Raw
+            Write-Host $debugLog
             
-            # 检查日志文件
-            $logFiles = @("nextest-debug.log", "nextest-startup.log", "nextest-crash.log")
-            foreach ($log in $logFiles) {
-              if (Test-Path $log) {
-                Write-Host "=== $log ==="
-                Get-Content $log
-              }
+            # 分析错误
+            if ($debugLog -match "ERROR|error|failed|Failed|FAILED") {
+              $hasError = $true
+              $errorMsg = "发现错误日志"
             }
-            
-            if ($exitCode -ne 0) {
-              Write-Error "程序异常退出，退出码: $exitCode"
-              exit 1
+            if ($debugLog -match "Tauri 运行失败") {
+              $hasError = $true
+              $errorMsg = "Tauri 运行失败"
             }
           } else {
-            Write-Host "程序正常运行中，PID: $($process.Id)"
-            # 成功启动，终止进程
+            Write-Host "警告: 未找到 nextest-debug.log"
+          }
+          
+          # 检查 crash 日志
+          if (Test-Path "nextest-crash.log") {
+            Write-Host "`n--- nextest-crash.log (崩溃日志!) ---"
+            $crashLog = Get-Content "nextest-crash.log" -Raw
+            Write-Host $crashLog
+            $hasError = $true
+            $errorMsg = "程序崩溃"
+          }
+          
+          Write-Host "`n========== 测试结果 =========="
+          
+          # 检查进程状态
+          $process.Refresh()
+          if ($process.HasExited) {
+            Write-Host "进程已退出，退出码: $($process.ExitCode)"
+            if ($process.ExitCode -ne 0) {
+              $hasError = $true
+              $errorMsg = "异常退出码: $($process.ExitCode)"
+            }
+          } else {
+            Write-Host "进程仍在运行，PID: $($process.Id)"
             Stop-Process -Id $process.Id -Force
-            Write-Host "测试通过！"
+          }
+          
+          if ($hasError) {
+            Write-Error "测试失败: $errorMsg"
+            exit 1
+          } else {
+            Write-Host "测试通过！程序正常启动"
           }
         shell: pwsh
 
