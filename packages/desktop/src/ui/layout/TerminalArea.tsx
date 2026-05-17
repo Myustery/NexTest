@@ -406,13 +406,6 @@ function TerminalArea({
     }
   };
 
-  const handleTabClose = useCallback((e: React.MouseEvent, sessionId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    log.info(`Tab关闭按钮点击 | sessionId=${sessionId}`);
-    onCloseSession(sessionId);
-  }, [onCloseSession]);
-
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex h-[var(--tab-height)] items-center bg-[var(--color-bg-elevated)]">
@@ -437,8 +430,8 @@ function TerminalArea({
                 onClick={(e) => {
                   e.stopPropagation();
                   e.preventDefault();
-                  log.info(`Tab关闭按钮点击 | sessionId=${sessionId}`);
-                  onCloseSession(sessionId);
+                  log.info(`Tab关闭按钮点击 | sessionId=${session.id}`);
+                  onCloseSession(session.id);
                 }}
                 className="tab-close"
                 type="button"
