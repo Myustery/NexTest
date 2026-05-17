@@ -1,12 +1,9 @@
 # 测试工作流
+# 仅在 PR 时运行，避免与 tag push 重复触发
 
 name: Test
 
 on:
-  push:
-    branches:
-      - main
-      - develop
   pull_request:
     branches:
       - main

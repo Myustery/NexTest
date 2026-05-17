@@ -1,19 +1,12 @@
 # Windows 桌面端构建工作流
-# 使用 Windows 原生 runner 构建，避免跨平台编译兼容性问题
+# 仅在 tag push 或手动触发时构建
 
 name: Build Windows Desktop
 
 on:
   push:
-    branches:
-      - main
-      - develop
     tags:
       - 'v*'
-  pull_request:
-    branches:
-      - main
-      - develop
   workflow_dispatch:
 
 env:
