@@ -9,7 +9,9 @@ interface SessionInfo {
   id: string;
   name: string;
   shell: string;
+  protocol: string;
   created_at: number;
+  status: string;
 }
 
 interface TerminalAreaProps {
@@ -284,27 +286,6 @@ function TerminalArea({
         shortcut: 'Ctrl+F',
         onClick: () => setShowSearch(true),
       },
-      { divider: true, label: '' },
-      {
-        label: '分屏',
-        icon: (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="3" width="18" height="18" rx="2"/>
-            <line x1="12" y1="3" x2="12" y2="21"/>
-          </svg>
-        ),
-        disabled: true,
-      },
-      {
-        label: '拆分终端',
-        icon: (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="3" width="18" height="18" rx="2"/>
-            <line x1="3" y1="12" x2="21" y2="12"/>
-          </svg>
-        ),
-        disabled: true,
-      },
     ]);
   }, [currentSession, showMenu]);
 
@@ -336,20 +317,14 @@ function TerminalArea({
           sessions.forEach(s => onCloseSession(s.id));
         },
       },
-      { divider: true, label: '' },
-      {
-        label: '重命名',
-        icon: (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
-          </svg>
-        ),
-        disabled: true,
-      },
     ]);
   }, [sessions, onCloseSession, showMenu]);
 
-  const getShellIcon = (shell: string) => {
+  const getShellIcon = (shell: string, protocol: string) => {
+    if (protocol === 'ssh') return '🔐';
+    if (protocol === 'telnet') return '🌐';
+    if (protocol === 'serial') return '🔌';
+    
     switch (shell) {
       case 'powershell':
       case 'pwsh':
@@ -359,12 +334,6 @@ function TerminalArea({
         return '🐧';
       case 'cmd':
         return '🖥️';
-      case 'ssh':
-        return '🔐';
-      case 'telnet':
-        return '🌐';
-      case 'serial':
-        return '🔌';
       default:
         return '⌨️';
     }
@@ -381,7 +350,7 @@ function TerminalArea({
               onContextMenu={(e) => handleTabContextMenu(e, session)}
               className={`tab-item ${currentSession?.id === session.id ? 'active' : ''}`}
             >
-              <span className="tab-icon">{getShellIcon(session.shell)}</span>
+              <span className="tab-icon">{getShellIcon(session.shell, session.protocol)}</span>
               <span className="tab-label">{session.name}</span>
               <button
                 onClick={(e) => {
@@ -397,16 +366,6 @@ function TerminalArea({
               </button>
             </div>
           ))}
-
-          {sessions.length === 0 && (
-            <div className="tab-item active">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="tab-icon">
-                <polyline points="4,17 10,11 4,5"/>
-                <line x1="12" y1="19" x2="20" y2="19"/>
-              </svg>
-              <span className="tab-label">欢迎使用</span>
-            </div>
-          )}
         </div>
 
         <div className="monaco-toolbar px-2">
@@ -456,7 +415,7 @@ function TerminalArea({
               <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
               <polyline points="9,22 9,12 15,12 15,22"/>
             </svg>
-            <span>{currentSession.shell}</span>
+            <span>{currentSession.protocol.toUpperCase()}</span>
           </div>
           <span className="breadcrumb-separator">›</span>
           <div className="breadcrumb-item">
@@ -485,15 +444,7 @@ function TerminalArea({
                 开始使用 NexTest
               </div>
               <div className="text-sm text-[var(--color-fg-subtle)]">
-                在左侧创建新终端会话
-              </div>
-              <div className="mt-6 flex items-center justify-center gap-4 text-xs text-[var(--color-fg-subtle)]">
-                <div className="flex items-center gap-1">
-                  <kbd className="rounded bg-[var(--color-bg-elevated)] px-1.5 py-0.5">Ctrl</kbd>
-                  <span>+</span>
-                  <kbd className="rounded bg-[var(--color-bg-elevated)] px-1.5 py-0.5">`</kbd>
-                  <span className="ml-1">切换终端</span>
-                </div>
+                点击左侧 + 创建新终端会话
               </div>
             </div>
           </div>

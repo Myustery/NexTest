@@ -2,9 +2,17 @@ import { useEffect, useState } from 'react';
 
 interface TitleBarProps {
   title?: string;
+  onNewSession?: () => void;
+  onToggleToolSidebar?: () => void;
+  onToggleCommandBar?: () => void;
 }
 
-function TitleBar({ title = 'NexTest' }: TitleBarProps) {
+function TitleBar({ 
+  title = 'NexTest',
+  onNewSession,
+  onToggleToolSidebar,
+  onToggleCommandBar,
+}: TitleBarProps) {
   const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
@@ -25,7 +33,8 @@ function TitleBar({ title = 'NexTest' }: TitleBarProps) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const handleMinimize = async () => {
+  const handleMinimize = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       await getCurrentWindow().minimize();
@@ -34,7 +43,8 @@ function TitleBar({ title = 'NexTest' }: TitleBarProps) {
     }
   };
 
-  const handleMaximize = async () => {
+  const handleMaximize = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       const win = getCurrentWindow();
@@ -45,7 +55,8 @@ function TitleBar({ title = 'NexTest' }: TitleBarProps) {
     }
   };
 
-  const handleClose = async () => {
+  const handleClose = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       await getCurrentWindow().close();
@@ -56,34 +67,52 @@ function TitleBar({ title = 'NexTest' }: TitleBarProps) {
 
   return (
     <div 
-      className="flex h-[30px] items-center justify-between bg-[var(--color-bg-elevated)] border-b border-[var(--color-border-subtle)] select-none"
+      className="flex h-[32px] items-center justify-between bg-[var(--color-bg-elevated)] border-b border-[var(--color-border-subtle)] select-none"
       data-tauri-drag-region
     >
       <div className="flex items-center h-full px-3" data-tauri-drag-region>
         <div className="flex items-center gap-2">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[var(--color-primary)]">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[var(--color-primary)]">
             <polyline points="4,17 10,11 4,5"/>
             <line x1="12" y1="19" x2="20" y2="19"/>
           </svg>
-          <span className="text-xs font-medium text-[var(--color-fg)]">{title}</span>
+          <span className="text-sm font-medium text-[var(--color-fg)]">{title}</span>
         </div>
       </div>
 
       <div className="flex items-center h-full" data-tauri-drag-region>
-        <div className="flex items-center gap-1 px-2 mr-1">
-          <button className="toolbar-btn" title="新建终端 (Ctrl+Shift+`)" data-tauri-drag-region={false}>
+        <div className="flex items-center gap-1 px-2 mr-2" data-tauri-drag-region="false">
+          <button 
+            className="toolbar-btn" 
+            title="新建终端 (Ctrl+Shift+`)"
+            onClick={onNewSession}
+          >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="12" y1="5" x2="12" y2="19"/>
               <line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
           </button>
-          <button className="toolbar-btn" title="搜索 (Ctrl+P)" data-tauri-drag-region={false}>
+          <button 
+            className="toolbar-btn" 
+            title="命令工具栏"
+            onClick={onToggleToolSidebar}
+          >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8"/>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <line x1="15" y1="3" x2="15" y2="21"/>
             </svg>
           </button>
-          <button className="toolbar-btn" title="设置" data-tauri-drag-region={false}>
+          <button 
+            className="toolbar-btn" 
+            title="全局命令栏"
+            onClick={onToggleCommandBar}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <line x1="3" y1="15" x2="21" y2="15"/>
+            </svg>
+          </button>
+          <button className="toolbar-btn" title="设置">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="3"/>
               <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33"/>
@@ -91,7 +120,7 @@ function TitleBar({ title = 'NexTest' }: TitleBarProps) {
           </button>
         </div>
 
-        <div className="flex items-center h-full windows-controls">
+        <div className="flex items-center h-full windows-controls" data-tauri-drag-region="false">
           <button
             className="window-btn minimize"
             onClick={handleMinimize}

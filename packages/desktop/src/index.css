@@ -588,3 +588,23 @@ body {
 .dragging .resize-handle {
   background: var(--color-primary);
 }
+
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+[data-tauri-drag-region="false"] {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.app-drag {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+.app-no-drag {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}

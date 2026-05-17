@@ -34,7 +34,41 @@ function ToolSidebar({ collapsed, onToggle }: ToolSidebarProps) {
   };
 
   if (collapsed) {
-    return null;
+    return (
+      <div className="flex w-[40px] flex-col items-center border-l border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] py-2">
+        <button
+          onClick={onToggle}
+          className="flex items-center justify-center w-8 h-8 rounded text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] hover:bg-[var(--color-bg-hover)]"
+          title="展开工具栏"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="9,18 15,12 9,6"/>
+          </svg>
+        </button>
+        
+        <div className="mt-4 flex flex-col items-center gap-2">
+          <button
+            className="flex items-center justify-center w-8 h-8 rounded text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] hover:bg-[var(--color-bg-hover)]"
+            title="快捷命令"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="4,17 10,11 4,5"/>
+              <line x1="12" y1="19" x2="20" y2="19"/>
+            </svg>
+          </button>
+          <button
+            className="flex items-center justify-center w-8 h-8 rounded text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] hover:bg-[var(--color-bg-hover)]"
+            title="命令片段"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <line x1="3" y1="9" x2="21" y2="9"/>
+              <line x1="3" y1="15" x2="21" y2="15"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -46,12 +80,11 @@ function ToolSidebar({ collapsed, onToggle }: ToolSidebarProps) {
         <div className="monaco-toolbar">
           <button
             onClick={onToggle}
-            title="关闭面板"
+            title="折叠面板"
             className="flex items-center justify-center"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
+              <polyline points="15,18 9,12 15,6"/>
             </svg>
           </button>
         </div>
@@ -142,7 +175,7 @@ function ToolSidebar({ collapsed, onToggle }: ToolSidebarProps) {
                 {expandedSnippets.has(snippet.id) && (
                   <div className="animate-slideIn">
                     {snippet.commands.map((cmd, index) => (
-                      <div key={index} className="list-item pl-6">
+                      <div key={index} className="list-item pl-6 group">
                         <span className="flex-1 truncate font-mono text-[12px]">{cmd}</span>
                         <button className="btn-icon opacity-0 group-hover:opacity-100" title="执行">
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">

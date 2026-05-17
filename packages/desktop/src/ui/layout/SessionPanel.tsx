@@ -1,12 +1,13 @@
-import { useState, useCallback } from 'react';
-import CreateSessionModal, { SessionConfig } from '../components/CreateSessionModal';
+import { useCallback } from 'react';
 import { useContextMenu } from '../components/ContextMenu';
 
 interface SessionInfo {
   id: string;
   name: string;
   shell: string;
+  protocol: string;
   created_at: number;
+  status: string;
 }
 
 interface SessionPanelProps {
@@ -15,30 +16,20 @@ interface SessionPanelProps {
   sessions: SessionInfo[];
   currentSession: SessionInfo | null;
   onSelectSession: (session: SessionInfo) => void;
-  onCreateSession: (name: string, shell?: string) => void;
+  onCreateSession: () => void;
   onCloseSession: (sessionId: string) => void;
 }
 
 function SessionPanel({
   collapsed,
+  onToggle,
   sessions,
   currentSession,
   onSelectSession,
   onCreateSession,
   onCloseSession,
 }: SessionPanelProps) {
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const { showMenu } = useContextMenu();
-
-  const handleCreateSession = async (config: SessionConfig) => {
-    try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      const session = await invoke<SessionInfo>('create_session', { config });
-      onCreateSession(session.name, session.shell);
-    } catch (error) {
-      console.error('创建会话失败:', error);
-    }
-  };
 
   const handleSessionContextMenu = useCallback((e: React.MouseEvent, session: SessionInfo) => {
     e.preventDefault();
@@ -46,35 +37,10 @@ function SessionPanel({
     showMenu(e.clientX, e.clientY, [
       {
         label: '打开',
-        icon: (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
-            <polyline points="15,3 21,3 21,9"/>
-            <line x1="10" y1="14" x2="21" y2="3"/>
-          </svg>
-        ),
         onClick: () => onSelectSession(session),
       },
       {
-        label: '在新窗口打开',
-        icon: (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="3" width="18" height="18" rx="2"/>
-            <line x1="12" y1="8" x2="12" y2="16"/>
-            <line x1="8" y1="12" x2="16" y2="12"/>
-          </svg>
-        ),
-        disabled: true,
-      },
-      { divider: true, label: '' },
-      {
         label: '复制名称',
-        icon: (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="9" y="9" width="13" height="13" rx="2"/>
-            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
-          </svg>
-        ),
         onClick: () => {
           navigator.clipboard.writeText(session.name);
         },
@@ -82,12 +48,6 @@ function SessionPanel({
       { divider: true, label: '' },
       {
         label: '关闭终端',
-        icon: (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        ),
         danger: true,
         onClick: () => onCloseSession(session.id),
       },
@@ -100,30 +60,22 @@ function SessionPanel({
     showMenu(e.clientX, e.clientY, [
       {
         label: '新建终端',
-        icon: (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-        ),
         shortcut: 'Ctrl+Shift+`',
-        onClick: () => setShowCreateModal(true),
+        onClick: onCreateSession,
       },
       { divider: true, label: '' },
       {
         label: '折叠侧边栏',
-        icon: (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="3" width="18" height="18" rx="2"/>
-            <line x1="9" y1="3" x2="9" y2="21"/>
-          </svg>
-        ),
-        disabled: true,
+        onClick: onToggle,
       },
     ]);
-  }, [showMenu]);
+  }, [showMenu, onCreateSession, onToggle]);
 
-  const getShellIcon = (shell: string) => {
+  const getShellIcon = (shell: string, protocol: string) => {
+    if (protocol === 'ssh') return '🔐';
+    if (protocol === 'telnet') return '🌐';
+    if (protocol === 'serial') return '🔌';
+    
     switch (shell) {
       case 'powershell':
       case 'pwsh':
@@ -133,45 +85,64 @@ function SessionPanel({
         return '🐧';
       case 'cmd':
         return '🖥️';
-      case 'ssh':
-        return '🔐';
-      case 'telnet':
-        return '🌐';
-      case 'serial':
-        return '🔌';
       default:
         return '⌨️';
     }
   };
 
-  const formatTime = (timestamp: number) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-  };
-
   if (collapsed) {
-    return null;
+    return (
+      <div className="flex w-[40px] flex-col items-center border-r border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] py-2">
+        <button
+          onClick={onToggle}
+          className="flex items-center justify-center w-8 h-8 rounded text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] hover:bg-[var(--color-bg-hover)]"
+          title="展开会话面板"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="15,6 9,12 15,18"/>
+          </svg>
+        </button>
+        <button
+          onClick={onCreateSession}
+          className="mt-2 flex items-center justify-center w-8 h-8 rounded text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] hover:bg-[var(--color-bg-hover)]"
+          title="新建终端"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </button>
+      </div>
+    );
   }
 
   return (
     <div 
-      className="flex w-[var(--sidebar-width)] min-w-[180px] max-w-[400px] flex-col bg-[var(--color-bg)]"
-      data-context-menu
+      className="flex w-[var(--sidebar-width)] min-w-[180px] max-w-[400px] flex-col border-r border-[var(--color-border-subtle)] bg-[var(--color-bg)]"
       onContextMenu={handlePanelContextMenu}
     >
       <div className="flex h-[var(--panel-header-height)] items-center justify-between border-b border-[var(--color-border-subtle)] px-3">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-fg-muted)]">
-          资源管理器
+          会话
         </span>
         <div className="monaco-toolbar">
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={onCreateSession}
             title="新建终端"
             className="flex items-center justify-center"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="12" y1="5" x2="12" y2="19"/>
               <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </button>
+          <button
+            onClick={onToggle}
+            title="折叠侧边栏"
+            className="flex items-center justify-center"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="15,6 9,12 15,18"/>
             </svg>
           </button>
         </div>
@@ -208,11 +179,11 @@ function SessionPanel({
                     currentSession?.id === session.id ? 'selected' : ''
                   }`}
                 >
-                  <span className="mr-2 text-sm">{getShellIcon(session.shell)}</span>
+                  <span className="mr-2 text-sm">{getShellIcon(session.shell, session.protocol)}</span>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[13px]">{session.name}</div>
                     <div className="text-[11px] text-[var(--color-fg-subtle)]">
-                      {session.shell} · {formatTime(session.created_at)}
+                      {session.protocol.toUpperCase()} · {session.name}
                     </div>
                   </div>
                   <div className={`status-dot ${currentSession?.id === session.id ? 'running' : 'idle'}`} />
@@ -235,12 +206,6 @@ function SessionPanel({
           )}
         </div>
       </div>
-
-      <CreateSessionModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onCreate={handleCreateSession}
-      />
     </div>
   );
 }
