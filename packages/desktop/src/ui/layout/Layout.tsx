@@ -8,6 +8,22 @@ import CommandBar from './CommandBar';
 import CreateSessionModal, { SessionConfig } from '../components/CreateSessionModal';
 import { ContextMenuProvider } from '../components/ContextMenu';
 
+// 日志工具函数
+const log = {
+  info: (component: string, message: string, ...args: unknown[]) => {
+    console.log(`[${new Date().toISOString()}] [${component}] ${message}`, ...args);
+  },
+  debug: (component: string, message: string, ...args: unknown[]) => {
+    console.debug(`[${new Date().toISOString()}] [${component}] ${message}`, ...args);
+  },
+  warn: (component: string, message: string, ...args: unknown[]) => {
+    console.warn(`[${new Date().toISOString()}] [${component}] ${message}`, ...args);
+  },
+  error: (component: string, message: string, ...args: unknown[]) => {
+    console.error(`[${new Date().toISOString()}] [${component}] ${message}`, ...args);
+  },
+};
+
 interface SessionInfo {
   id: string;
   name: string;
@@ -25,35 +41,58 @@ function LayoutContent() {
   const [currentSession, setCurrentSession] = useState<SessionInfo | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
+  const COMPONENT = 'Layout';
+
   useEffect(() => {
+    log.info(COMPONENT, '组件初始化');
+    
     const loadSessions = async () => {
       try {
+        log.debug(COMPONENT, '加载会话列表...');
         const result = await invoke<SessionInfo[]>('get_sessions');
+        log.info(COMPONENT, '会话列表加载成功', { count: result.length, sessions: result });
         setSessions(result);
         if (result.length > 0 && !currentSession) {
+          log.debug(COMPONENT, '自动选择第一个会话', { sessionId: result[0].id });
           setCurrentSession(result[0]);
         }
       } catch (error) {
-        console.error('加载会话失败:', error);
+        log.error(COMPONENT, '加载会话失败', error);
       }
     };
     
     loadSessions();
     const interval = setInterval(loadSessions, 5000);
-    return () => clearInterval(interval);
+    
+    return () => {
+      log.debug(COMPONENT, '组件卸载，清理定时器');
+      clearInterval(interval);
+    };
   }, []);
 
   const handleCreateSession = useCallback(async (config: SessionConfig) => {
+    const requestId = Math.random().toString(36).substring(7);
+    log.info(COMPONENT, `[${requestId}] 开始创建会话`, config);
+    
     try {
-      console.log('创建会话配置:', config);
-      
+      log.debug(COMPONENT, `[${requestId}] 调用 create_session 命令...`);
       const session = await invoke<SessionInfo>('create_session', { config });
-      console.log('会话创建成功:', session);
+      log.info(COMPONENT, `[${requestId}] 会话创建成功`, session);
       
-      setSessions(prev => [...prev, session]);
+      log.debug(COMPONENT, `[${requestId}] 更新会话列表...`);
+      setSessions(prev => {
+        const newSessions = [...prev, session];
+        log.debug(COMPONENT, `[${requestId}] 新会话列表`, { count: newSessions.length });
+        return newSessions;
+      });
+      
+      log.debug(COMPONENT, `[${requestId}] 切换到新会话`, { sessionId: session.id });
       setCurrentSession(session);
+      
+      log.debug(COMPONENT, `[${requestId}] 关闭创建弹窗`);
       setShowCreateModal(false);
       
+      log.debug(COMPONENT, `[${requestId}] 保存会话到数据库...`);
       await invoke('save_session', {
         session: {
           id: session.id,
@@ -69,54 +108,88 @@ function LayoutContent() {
           last_used_at: session.created_at,
         }
       });
+      log.info(COMPONENT, `[${requestId}] 会话已保存到数据库`);
       
     } catch (error) {
-      console.error('创建会话失败:', error);
+      log.error(COMPONENT, `[${requestId}] 创建会话失败`, error);
       alert(`创建会话失败: ${error}`);
     }
   }, []);
 
   const handleCloseSession = useCallback(async (sessionId: string) => {
-    console.log('关闭会话:', sessionId);
+    const requestId = Math.random().toString(36).substring(7);
+    log.info(COMPONENT, `[${requestId}] 开始关闭会话`, { sessionId });
+    
     try {
+      log.debug(COMPONENT, `[${requestId}] 调用 close_session 命令...`);
       await invoke('close_session', { sessionId });
-      console.log('会话已关闭:', sessionId);
+      log.info(COMPONENT, `[${requestId}] 会话已关闭`, { sessionId });
+      
+      log.debug(COMPONENT, `[${requestId}] 更新会话列表...`);
       setSessions(prev => {
         const newSessions = prev.filter(s => s.id !== sessionId);
-        // 如果关闭的是当前会话，切换到第一个可用会话
+        log.debug(COMPONENT, `[${requestId}] 新会话列表`, { 
+          count: newSessions.length, 
+          removed: sessionId 
+        });
+        
         if (currentSession?.id === sessionId) {
-          setCurrentSession(newSessions.length > 0 ? newSessions[0] : null);
+          const nextSession = newSessions.length > 0 ? newSessions[0] : null;
+          log.debug(COMPONENT, `[${requestId}] 当前会话已关闭，切换到`, { 
+            nextSessionId: nextSession?.id ?? 'null' 
+          });
+          setCurrentSession(nextSession);
         }
         return newSessions;
       });
     } catch (error) {
-      console.error('关闭会话失败:', error);
+      log.error(COMPONENT, `[${requestId}] 关闭会话失败`, error);
     }
   }, [currentSession]);
+
+  const handleSelectSession = useCallback((session: SessionInfo) => {
+    log.info(COMPONENT, '选择会话', { sessionId: session.id, name: session.name });
+    setCurrentSession(session);
+  }, []);
 
   return (
     <div className="flex h-screen flex-col bg-[var(--color-bg-deep)]">
       <TitleBar 
-        onNewSession={() => setShowCreateModal(true)}
-        onToggleToolSidebar={() => setToolCollapsed(!toolCollapsed)}
-        onToggleCommandBar={() => setCommandBarCollapsed(!commandBarCollapsed)}
+        onNewSession={() => {
+          log.debug(COMPONENT, '点击新建终端按钮');
+          setShowCreateModal(true);
+        }}
+        onToggleToolSidebar={() => {
+          log.debug(COMPONENT, '切换工具栏', { collapsed: !toolCollapsed });
+          setToolCollapsed(!toolCollapsed);
+        }}
+        onToggleCommandBar={() => {
+          log.debug(COMPONENT, '切换命令栏', { collapsed: !commandBarCollapsed });
+          setCommandBarCollapsed(!commandBarCollapsed);
+        }}
       />
       
       <div className="flex flex-1 overflow-hidden">
         <SessionPanel
           collapsed={sessionCollapsed}
-          onToggle={() => setSessionCollapsed(!sessionCollapsed)}
+          onToggle={() => {
+            log.debug(COMPONENT, '切换会话面板', { collapsed: !sessionCollapsed });
+            setSessionCollapsed(!sessionCollapsed);
+          }}
           sessions={sessions}
           currentSession={currentSession}
-          onSelectSession={setCurrentSession}
-          onCreateSession={() => setShowCreateModal(true)}
+          onSelectSession={handleSelectSession}
+          onCreateSession={() => {
+            log.debug(COMPONENT, '从会话面板创建新会话');
+            setShowCreateModal(true);
+          }}
           onCloseSession={handleCloseSession}
         />
 
         <TerminalArea
           currentSession={currentSession}
           sessions={sessions}
-          onSelectSession={setCurrentSession}
+          onSelectSession={handleSelectSession}
           onCloseSession={handleCloseSession}
         />
 
@@ -134,7 +207,10 @@ function LayoutContent() {
 
       <CreateSessionModal
         isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        onClose={() => {
+          log.debug(COMPONENT, '关闭创建会话弹窗');
+          setShowCreateModal(false);
+        }}
         onCreate={handleCreateSession}
       />
     </div>

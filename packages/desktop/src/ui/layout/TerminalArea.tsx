@@ -5,6 +5,23 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 import { useContextMenu } from '../components/ContextMenu';
 
+const COMPONENT = 'TerminalArea';
+
+const log = {
+  info: (message: string, ...args: unknown[]) => {
+    console.log(`[${new Date().toISOString()}] [${COMPONENT}] ${message}`, ...args);
+  },
+  debug: (message: string, ...args: unknown[]) => {
+    console.debug(`[${new Date().toISOString()}] [${COMPONENT}] ${message}`, ...args);
+  },
+  warn: (message: string, ...args: unknown[]) => {
+    console.warn(`[${new Date().toISOString()}] [${COMPONENT}] ${message}`, ...args);
+  },
+  error: (message: string, ...args: unknown[]) => {
+    console.error(`[${new Date().toISOString()}] [${COMPONENT}] ${message}`, ...args);
+  },
+};
+
 interface SessionInfo {
   id: string;
   name: string;
@@ -61,6 +78,8 @@ function TerminalArea({
   const { showMenu } = useContextMenu();
 
   const createTerminal = useCallback((sessionId: string) => {
+    log.info(`创建终端实例 | sessionId=${sessionId}`);
+    
     const term = new Terminal({
       fontSize: 14,
       fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, 'Courier New', monospace",
@@ -83,83 +102,113 @@ function TerminalArea({
     term.loadAddon(links);
 
     terminals.set(sessionId, { term, fit });
+    log.debug(`终端实例已缓存 | sessionId=${sessionId} | 缓存数量=${terminals.size}`);
 
     return { term, fit };
   }, []);
 
   const mountTerminal = useCallback((sessionId: string) => {
-    if (!containerRef.current) return;
+    log.debug(`挂载终端 | sessionId=${sessionId}`);
+    
+    if (!containerRef.current) {
+      log.warn('容器引用为空，无法挂载终端');
+      return;
+    }
 
     containerRef.current.innerHTML = '';
 
     let terminalData = terminals.get(sessionId);
     if (!terminalData) {
+      log.debug(`终端不存在，创建新终端 | sessionId=${sessionId}`);
       terminalData = createTerminal(sessionId);
     }
 
     const { term, fit } = terminalData;
 
     if (!term.element) {
+      log.debug(`打开终端 | sessionId=${sessionId}`);
       term.open(containerRef.current);
     }
 
-    requestAnimationFrame(() => fit.fit());
+    requestAnimationFrame(() => {
+      fit.fit();
+      log.debug(`终端尺寸调整完成 | sessionId=${sessionId}`);
+    });
 
     term.onData(async (data) => {
+      log.debug(`终端输入 | sessionId=${sessionId} | len=${data.length}`);
       try {
         const { invoke } = await import('@tauri-apps/api/core');
         await invoke('write_pty', { sessionId, data });
       } catch (error) {
-        console.error('写入 PTY 失败:', error);
+        log.error(`写入 PTY 失败 | sessionId=${sessionId}`, error);
       }
     });
 
     term.onResize(async ({ cols, rows }) => {
+      log.debug(`终端尺寸变化 | sessionId=${sessionId} | ${cols}x${rows}`);
       try {
         const { invoke } = await import('@tauri-apps/api/core');
         await invoke('resize_pty', { sessionId, rows, cols });
       } catch (error) {
-        console.error('调整 PTY 大小失败:', error);
+        log.error(`调整 PTY 大小失败 | sessionId=${sessionId}`, error);
       }
     });
   }, [createTerminal]);
 
   const startReading = useCallback((sessionId: string) => {
+    log.info(`开始读取终端输出 | sessionId=${sessionId}`);
+    
     if (readIntervalRef.current) {
       clearInterval(readIntervalRef.current);
     }
 
+    let readCount = 0;
     readIntervalRef.current = window.setInterval(async () => {
       try {
         const { invoke } = await import('@tauri-apps/api/core');
         const data = await invoke<string>('read_pty', { sessionId });
         if (data) {
+          readCount++;
           const terminalData = terminals.get(sessionId);
           if (terminalData) {
             terminalData.term.write(data);
+            if (readCount % 100 === 0) {
+              log.debug(`终端输出累计 | sessionId=${sessionId} | reads=${readCount}`);
+            }
           }
         }
       } catch (error) {
-        console.error('读取 PTY 失败:', error);
+        log.error(`读取 PTY 失败 | sessionId=${sessionId}`, error);
       }
     }, 50);
+    
+    log.debug(`读取定时器已启动 | interval=50ms`);
   }, []);
 
   useEffect(() => {
+    log.info('组件初始化');
+    
     return () => {
+      log.info('组件卸载，清理资源');
       if (readIntervalRef.current) {
         clearInterval(readIntervalRef.current);
       }
-      terminals.forEach(({ term }) => term.dispose());
+      terminals.forEach(({ term }, id) => {
+        log.debug(`销毁终端 | sessionId=${id}`);
+        term.dispose();
+      });
       terminals.clear();
     };
   }, []);
 
   useEffect(() => {
     if (currentSession) {
+      log.info(`切换会话 | sessionId=${currentSession.id} | name=${currentSession.name}`);
       mountTerminal(currentSession.id);
       startReading(currentSession.id);
     } else {
+      log.info('无当前会话，停止读取');
       if (readIntervalRef.current) {
         clearInterval(readIntervalRef.current);
       }
@@ -193,10 +242,12 @@ function TerminalArea({
     if (e.ctrlKey && e.key === 'f') {
       e.preventDefault();
       setShowSearch(true);
+      log.debug('打开搜索');
     }
     if (e.key === 'Escape' && showSearch) {
       setShowSearch(false);
       setSearchTerm('');
+      log.debug('关闭搜索');
     }
   }, [showSearch]);
 
@@ -209,18 +260,13 @@ function TerminalArea({
     showMenu(e.clientX, e.clientY, [
       {
         label: '复制',
-        icon: (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="9" y="9" width="13" height="13" rx="2"/>
-            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
-          </svg>
-        ),
         shortcut: 'Ctrl+Shift+C',
         onClick: () => {
           if (terminalData) {
             const selection = terminalData.term.getSelection();
             if (selection) {
               navigator.clipboard.writeText(selection);
+              log.debug('复制选中内容', { len: selection.length });
             }
           }
         },
@@ -228,32 +274,22 @@ function TerminalArea({
       },
       {
         label: '粘贴',
-        icon: (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/>
-            <rect x="8" y="2" width="8" height="4" rx="1"/>
-          </svg>
-        ),
         shortcut: 'Ctrl+Shift+V',
         onClick: async () => {
           const text = await navigator.clipboard.readText();
           if (text && currentSession) {
+            log.debug('粘贴内容', { len: text.length });
             try {
               const { invoke } = await import('@tauri-apps/api/core');
               await invoke('write_pty', { sessionId: currentSession.id, data: text });
             } catch (error) {
-              console.error('粘贴失败:', error);
+              log.error('粘贴失败', error);
             }
           }
         },
       },
       {
         label: '全选',
-        icon: (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="3" width="18" height="18" rx="2"/>
-          </svg>
-        ),
         shortcut: 'Ctrl+Shift+A',
         onClick: () => {
           if (terminalData) {
@@ -264,25 +300,15 @@ function TerminalArea({
       { divider: true, label: '' },
       {
         label: '清屏',
-        icon: (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-          </svg>
-        ),
         onClick: () => {
           if (terminalData) {
             terminalData.term.clear();
+            log.debug('清屏');
           }
         },
       },
       {
         label: '搜索',
-        icon: (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="8"/>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-        ),
         shortcut: 'Ctrl+F',
         onClick: () => setShowSearch(true),
       },
@@ -296,24 +322,23 @@ function TerminalArea({
     showMenu(e.clientX, e.clientY, [
       {
         label: '关闭',
-        icon: (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        ),
         shortcut: 'Ctrl+W',
-        onClick: () => onCloseSession(session.id),
+        onClick: () => {
+          log.info(`右键菜单关闭会话 | sessionId=${session.id}`);
+          onCloseSession(session.id);
+        },
       },
       {
         label: '关闭其他',
         onClick: () => {
+          log.info(`右键菜单关闭其他会话 | keepSessionId=${session.id}`);
           sessions.filter(s => s.id !== session.id).forEach(s => onCloseSession(s.id));
         },
       },
       {
         label: '关闭所有',
         onClick: () => {
+          log.info('右键菜单关闭所有会话');
           sessions.forEach(s => onCloseSession(s.id));
         },
       },
@@ -359,7 +384,7 @@ function TerminalArea({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  console.log('TerminalArea 关闭按钮点击:', session.id);
+                  log.info(`Tab 关闭按钮点击 | sessionId=${session.id}`);
                   onCloseSession(session.id);
                 }}
                 className="tab-close cursor-pointer"
@@ -401,6 +426,7 @@ function TerminalArea({
                 const terminalData = terminals.get(currentSession.id);
                 if (terminalData) {
                   terminalData.term.clear();
+                  log.debug('清屏按钮点击');
                 }
               }
             }}
