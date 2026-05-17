@@ -30,11 +30,7 @@ function App() {
 
   return (
     <Routes>
-      {/* 主应用布局 */}
-      <Route path="/" element={<Layout />}>
-        <Route index element={<TerminalPage />} />
-        <Route path="settings" element={<SettingsPage />} />
-      </Route>
+      <Route path="/" element={<Layout />} />
     </Routes>
   );
 }
