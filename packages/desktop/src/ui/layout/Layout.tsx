@@ -27,8 +27,12 @@ function LayoutContent() {
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [currentSession, setCurrentSession] = useState<SessionInfo | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  
+  const [globalCommandExpanded, setGlobalCommandExpanded] = useState(true);
+  const [globalCommandHeight, setGlobalCommandHeight] = useState(100);
+  const [globalCommandText, setGlobalCommandText] = useState('');
+  const [globalIsRunning, setGlobalIsRunning] = useState(false);
 
-  // 加载已保存的会话
   useEffect(() => {
     log.info('组件初始化');
     loadSavedSessions();
@@ -38,13 +42,11 @@ function LayoutContent() {
     try {
       const result = await invoke<SessionInfo[]>('get_sessions');
       log.info('加载已保存会话', result.length);
-      // 只加载会话配置，不自动创建连接
     } catch (err) {
       log.error('加载会话失败', err);
     }
   };
 
-  // 创建会话
   const handleCreateSession = useCallback(async (config: SessionConfig) => {
     log.info('创建会话', config);
     
@@ -56,7 +58,6 @@ function LayoutContent() {
       setCurrentSession(session);
       setShowCreateModal(false);
       
-      // 保存会话配置
       try {
         await invoke('save_session', {
           session: {
@@ -83,7 +84,6 @@ function LayoutContent() {
     }
   }, []);
 
-  // 关闭会话
   const handleCloseSession = useCallback(async (sessionId: string) => {
     log.info('关闭会话', sessionId);
     
@@ -107,24 +107,60 @@ function LayoutContent() {
     }
   }, [currentSession]);
 
-  // 选择会话
   const handleSelectSession = useCallback((session: SessionInfo) => {
     log.info('选择会话', session.id);
     setCurrentSession(session);
   }, []);
 
+  const handleGlobalCommandRun = useCallback(async () => {
+    if (!currentSession || !globalCommandText.trim()) return;
+    log.info(`全局命令执行 | sessionId=${currentSession.id} | command=${globalCommandText.trim()}`);
+    setGlobalIsRunning(true);
+    try {
+      await invoke('execute_command', { sessionId: currentSession.id, command: globalCommandText.trim() });
+    } catch (error) {
+      log.error('全局命令执行失败', error);
+    } finally {
+      setGlobalIsRunning(false);
+    }
+  }, [currentSession, globalCommandText]);
+
+  const handleGlobalCommandStop = useCallback(() => {
+    log.info('停止全局命令执行');
+    setGlobalIsRunning(false);
+  }, []);
+
+  const handleGlobalResizeMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = globalCommandHeight;
+    
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const delta = startY - moveEvent.clientY;
+      const newHeight = Math.max(60, Math.min(300, startHeight + delta));
+      setGlobalCommandHeight(newHeight);
+    };
+    
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.classList.remove('dragging');
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.classList.add('dragging');
+  }, [globalCommandHeight]);
+
   return (
     <div className="flex h-screen flex-col bg-[var(--color-bg-deep)]">
-      {/* 标题栏 */}
       <TitleBar 
         onNewSession={() => setShowCreateModal(true)}
         onToggleToolSidebar={() => setToolCollapsed(!toolCollapsed)}
-        onToggleCommandBar={() => {}}
+        onToggleCommandBar={() => setGlobalCommandExpanded(!globalCommandExpanded)}
       />
       
-      {/* 主内容区 */}
       <div className="flex flex-1 overflow-hidden">
-        {/* 会话面板 */}
         <SessionPanel
           collapsed={sessionCollapsed}
           onToggle={() => setSessionCollapsed(!sessionCollapsed)}
@@ -135,7 +171,6 @@ function LayoutContent() {
           onCloseSession={handleCloseSession}
         />
 
-        {/* 终端区（包含命令编辑区） */}
         <TerminalArea
           currentSession={currentSession}
           sessions={sessions}
@@ -143,30 +178,82 @@ function LayoutContent() {
           onCloseSession={handleCloseSession}
         />
 
-        {/* 工具侧边栏 */}
         <ToolSidebar
           collapsed={toolCollapsed}
           onToggle={() => setToolCollapsed(!toolCollapsed)}
         />
       </div>
 
-      {/* 状态栏 */}
-      <div className="flex items-center h-[22px] px-2 bg-[var(--color-primary)] text-white text-xs">
-        <div className="flex items-center gap-2">
-          <span className="status-dot running" style={{ width: '6px', height: '6px' }} />
-          <span>{currentSession ? '已连接' : '就绪'}</span>
-        </div>
-        <span className="mx-2">·</span>
-        <span>{currentSession?.shell ?? '无会话'}</span>
-        <span className="mx-2">·</span>
-        <span>{currentSession?.name ?? '-'}</span>
-        <div className="flex-1" />
-        <span>NexTest v0.1.4</span>
-        <span className="mx-2">·</span>
-        <span>UTF-8</span>
+      {globalCommandExpanded && (
+        <>
+          <div 
+            className="h-[3px] cursor-row-resize bg-[var(--color-border-subtle)] hover:bg-[var(--color-primary)]"
+            onMouseDown={handleGlobalResizeMouseDown}
+          />
+          <div 
+            className="bg-[var(--color-bg-elevated)] border-t border-[var(--color-border-subtle)]"
+            style={{ height: `${globalCommandHeight}px` }}
+          >
+            <div className="flex items-center h-[28px] px-2 border-b border-[var(--color-border-subtle)]">
+              <button
+                className="btn-icon mr-1"
+                onClick={handleGlobalCommandRun}
+                disabled={globalIsRunning || !globalCommandText.trim() || !currentSession}
+                title="运行 (Enter)"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-[var(--color-success)]">
+                  <polygon points="5,3 19,12 5,21"/>
+                </svg>
+              </button>
+              <button
+                className="btn-icon mr-2"
+                onClick={handleGlobalCommandStop}
+                disabled={!globalIsRunning}
+                title="停止"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-[var(--color-error)]">
+                  <rect x="6" y="6" width="12" height="12"/>
+                </svg>
+              </button>
+              <span className="text-xs text-[var(--color-fg-muted)]">全局命令</span>
+            </div>
+            
+            <textarea
+              value={globalCommandText}
+              onChange={(e) => setGlobalCommandText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleGlobalCommandRun();
+                }
+              }}
+              placeholder="输入命令，按 Enter 执行..."
+              className="w-full h-[calc(100%-28px)] p-2 bg-transparent border-none outline-none resize-none text-[var(--color-fg)] text-sm font-mono"
+            />
+          </div>
+        </>
+      )}
+
+      <div className="flex items-center h-[24px] px-2 bg-[var(--color-bg-elevated)] border-t border-[var(--color-border-subtle)]">
+        <button
+          className="flex items-center gap-1 text-xs text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]"
+          onClick={() => setGlobalCommandExpanded(!globalCommandExpanded)}
+        >
+          <svg 
+            width="12" 
+            height="12" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2"
+            style={{ transform: globalCommandExpanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}
+          >
+            <polyline points="9,18 15,12 9,6"/>
+          </svg>
+          <span>{globalCommandExpanded ? '隐藏' : '显示'}全局命令区</span>
+        </button>
       </div>
 
-      {/* 创建会话弹窗 */}
       <CreateSessionModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}

@@ -313,7 +313,8 @@ body {
   opacity: 0;
   transition: opacity 0.1s ease;
   flex-shrink: 0;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 .tab-item:hover .tab-close,
