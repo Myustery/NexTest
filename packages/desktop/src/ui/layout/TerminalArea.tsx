@@ -180,12 +180,12 @@ function TerminalArea({
       term.open(containerRef.current);
     }
 
-    requestAnimationFrame(() => {
+    setTimeout(() => {
       fit.fit();
       log.debug(`终端fit完成 | sessionId=${sessionId}`);
       term.focus();
       log.debug(`终端已focus | sessionId=${sessionId}`);
-    });
+    }, 50);
   }, [createTerminalInstance]);
 
   const startReadingOutput = useCallback((sessionId: string) => {
@@ -406,6 +406,20 @@ function TerminalArea({
     }
   };
 
+  const handleTabCloseClick = useCallback((e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation();
+    log.info(`Tab关闭按钮点击 | sessionId=${sessionId}`);
+    onCloseSession(sessionId);
+  }, [onCloseSession]);
+
+  const handleSessionCloseClick = useCallback((e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation();
+    log.info(`会话关闭按钮点击 | sessionId=${sessionId}`);
+    onCloseSession(sessionId);
+  }, [onCloseSession]);
+
+  const lines = commandText.split('\n');
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex h-[var(--tab-height)] items-center bg-[var(--color-bg-elevated)]">
@@ -422,26 +436,15 @@ function TerminalArea({
             >
               <span className="tab-icon">{getShellIcon(session.shell, session.protocol)}</span>
               <span className="tab-label">{session.name}</span>
-              <button
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  log.info(`Tab关闭按钮点击 | sessionId=${session.id}`);
-                  onCloseSession(session.id);
-                }}
+              <span 
                 className="tab-close"
-                type="button"
-                style={{ pointerEvents: 'auto' }}
+                onClick={(e) => handleTabCloseClick(e, session.id)}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <line x1="18" y1="6" x2="6" y2="18"/>
                   <line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
-              </button>
+              </span>
             </div>
           ))}
         </div>
@@ -551,13 +554,18 @@ function TerminalArea({
                 <span className="text-xs text-[var(--color-fg-muted)]">命令编辑</span>
               </div>
               
-              <div className="flex-1 overflow-hidden flex">
+              <div className="flex-1 overflow-auto flex">
                 <div 
-                  className="flex-shrink-0 w-[40px] bg-[var(--color-bg)] border-r border-[var(--color-border-subtle)] overflow-hidden select-none"
-                  style={{ fontSize: '12px', fontFamily: "'JetBrains Mono', monospace", lineHeight: '1.5' }}
+                  className="flex-shrink-0 w-[40px] bg-[var(--color-bg)] border-r border-[var(--color-border-subtle)] select-none"
+                  style={{ 
+                    fontSize: '14px', 
+                    fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, 'Courier New', monospace", 
+                    lineHeight: '18px',
+                    paddingTop: '8px',
+                  }}
                 >
-                  {commandText.split('\n').map((_, i) => (
-                    <div key={i} className="text-right pr-2 text-[var(--color-fg-subtle)]">
+                  {lines.map((_, i) => (
+                    <div key={i} className="text-right pr-2 text-[var(--color-fg-subtle)]" style={{ height: '18px' }}>
                       {i + 1}
                     </div>
                   ))}
@@ -572,8 +580,12 @@ function TerminalArea({
                     }
                   }}
                   placeholder="输入命令，按 Enter 执行..."
-                  className="flex-1 p-2 bg-transparent border-none outline-none resize-none text-[var(--color-fg)] text-sm font-mono"
-                  style={{ lineHeight: '1.5' }}
+                  className="flex-1 p-2 bg-transparent border-none outline-none resize-none text-[var(--color-fg)]"
+                  style={{ 
+                    fontSize: '14px', 
+                    fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, 'Courier New', monospace", 
+                    lineHeight: '18px' 
+                  }}
                 />
               </div>
             </div>

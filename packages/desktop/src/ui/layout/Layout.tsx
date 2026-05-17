@@ -218,13 +218,18 @@ function LayoutContent() {
               <span className="text-xs text-[var(--color-fg-muted)]">全局命令</span>
             </div>
             
-            <div className="flex-1 flex">
+            <div className="flex-1 overflow-auto flex">
               <div 
-                className="flex-shrink-0 w-[40px] bg-[var(--color-bg)] border-r border-[var(--color-border-subtle)] overflow-hidden select-none"
-                style={{ fontSize: '12px', fontFamily: "'JetBrains Mono', monospace", lineHeight: '1.5' }}
+                className="flex-shrink-0 w-[40px] bg-[var(--color-bg)] border-r border-[var(--color-border-subtle)] select-none"
+                style={{ 
+                  fontSize: '14px', 
+                  fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, 'Courier New', monospace", 
+                  lineHeight: '18px',
+                  paddingTop: '8px',
+                }}
               >
                 {globalCommandText.split('\n').map((_, i) => (
-                  <div key={i} className="text-right pr-2 text-[var(--color-fg-subtle)]">
+                  <div key={i} className="text-right pr-2 text-[var(--color-fg-subtle)]" style={{ height: '18px' }}>
                     {i + 1}
                   </div>
                 ))}
@@ -239,8 +244,12 @@ function LayoutContent() {
                   }
                 }}
                 placeholder="输入命令，按 Enter 执行..."
-                className="flex-1 p-2 bg-transparent border-none outline-none resize-none text-[var(--color-fg)] text-sm font-mono"
-                style={{ lineHeight: '1.5' }}
+                className="flex-1 p-2 bg-transparent border-none outline-none resize-none text-[var(--color-fg)]"
+                style={{ 
+                  fontSize: '14px', 
+                  fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, 'Courier New', monospace", 
+                  lineHeight: '18px' 
+                }}
               />
             </div>
           </div>

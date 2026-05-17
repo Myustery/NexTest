@@ -399,6 +399,29 @@ body {
   flex-shrink: 0;
 }
 
+.session-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: 4px;
+  border-radius: 3px;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.list-item:hover .session-close-btn {
+  opacity: 1;
+}
+
+.session-close-btn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-fg);
+}
+
 .btn-primary {
   display: inline-flex;
   align-items: center;
@@ -600,22 +623,17 @@ body {
   background: var(--color-primary);
 }
 
-[data-tauri-drag-region] {
+.titlebar-drag {
   -webkit-app-region: drag;
   app-region: drag;
 }
 
-[data-tauri-drag-region="false"] {
+.titlebar-nodrag {
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
 
-.app-drag {
-  -webkit-app-region: drag;
-  app-region: drag;
-}
-
-.app-no-drag {
+.titlebar-nodrag * {
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }

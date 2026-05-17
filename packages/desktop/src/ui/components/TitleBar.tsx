@@ -14,106 +14,56 @@ function TitleBar({
   onToggleCommandBar,
 }: TitleBarProps) {
   const [isMaximized, setIsMaximized] = useState(false);
-  const [windowApi, setWindowApi] = useState<{
-    minimize: () => Promise<void>;
-    toggleMaximize: () => Promise<void>;
-    close: () => Promise<void>;
-    isMaximized: () => Promise<boolean>;
-  } | null>(null);
 
   useEffect(() => {
     const initWindow = async () => {
       try {
         const { getCurrentWindow } = await import('@tauri-apps/api/window');
         const win = getCurrentWindow();
-        
-        const api = {
-          minimize: async () => {
-            console.log('[TitleBar] 调用 minimize');
-            await win.minimize();
-            console.log('[TitleBar] minimize 完成');
-          },
-          toggleMaximize: async () => {
-            console.log('[TitleBar] 调用 toggleMaximize');
-            await win.toggleMaximize();
-            console.log('[TitleBar] toggleMaximize 完成');
-          },
-          close: async () => {
-            console.log('[TitleBar] 调用 close');
-            await win.close();
-            console.log('[TitleBar] close 完成');
-          },
-          isMaximized: async () => {
-            const result = await win.isMaximized();
-            console.log('[TitleBar] isMaximized =', result);
-            return result;
-          },
-        };
-        
-        setWindowApi(api);
-        
-        const maximized = await api.isMaximized();
+        const maximized = await win.isMaximized();
         setIsMaximized(maximized);
-        
-        console.log('[TitleBar] 窗口 API 初始化成功');
+        console.log('[TitleBar] 初始化完成, isMaximized=', maximized);
       } catch (err) {
-        console.error('[TitleBar] 窗口 API 初始化失败:', err);
+        console.error('[TitleBar] 初始化失败:', err);
       }
     };
-    
     initWindow();
   }, []);
 
   const handleMinimize = async () => {
-    console.log('[TitleBar] handleMinimize 开始');
-    if (!windowApi) {
-      console.error('[TitleBar] windowApi 为空');
-      return;
-    }
     try {
-      await windowApi.minimize();
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      await getCurrentWindow().minimize();
     } catch (err) {
-      console.error('[TitleBar] minimize 异常:', err);
+      console.error('[TitleBar] minimize 错误:', err);
     }
   };
 
   const handleMaximize = async () => {
-    console.log('[TitleBar] handleMaximize 开始');
-    if (!windowApi) {
-      console.error('[TitleBar] windowApi 为空');
-      return;
-    }
     try {
-      await windowApi.toggleMaximize();
-      const maximized = await windowApi.isMaximized();
-      setIsMaximized(maximized);
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      const win = getCurrentWindow();
+      await win.toggleMaximize();
+      setIsMaximized(await win.isMaximized());
     } catch (err) {
-      console.error('[TitleBar] toggleMaximize 异常:', err);
+      console.error('[TitleBar] toggleMaximize 错误:', err);
     }
   };
 
   const handleClose = async () => {
-    console.log('[TitleBar] handleClose 开始');
-    if (!windowApi) {
-      console.error('[TitleBar] windowApi 为空');
-      return;
-    }
     try {
-      await windowApi.close();
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      await getCurrentWindow().close();
     } catch (err) {
-      console.error('[TitleBar] close 异常:', err);
+      console.error('[TitleBar] close 错误:', err);
     }
   };
 
   return (
     <div 
-      className="flex h-[32px] items-center justify-between bg-[var(--color-bg-elevated)] border-b border-[var(--color-border-subtle)] select-none"
-      data-tauri-drag-region
+      className="flex h-[32px] items-center justify-between bg-[var(--color-bg-elevated)] border-b border-[var(--color-border-subtle)] select-none titlebar-drag"
     >
-      <div 
-        className="flex items-center h-full px-3"
-        data-tauri-drag-region
-      >
+      <div className="flex items-center h-full px-3 titlebar-drag">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[var(--color-primary)]">
           <polyline points="4,17 10,11 4,5"/>
           <line x1="12" y1="19" x2="20" y2="19"/>
@@ -121,15 +71,12 @@ function TitleBar({
         <span className="ml-2 text-sm font-medium text-[var(--color-fg)]">{title}</span>
       </div>
 
-      <div className="flex items-center h-full app-no-drag" data-tauri-drag-region="false">
+      <div className="flex items-center h-full titlebar-nodrag">
         <div className="flex items-center gap-1 px-2">
           <button 
             className="toolbar-btn"
             title="新建终端"
-            onClick={() => {
-              console.log('[TitleBar] 点击新建终端');
-              onNewSession?.();
-            }}
+            onClick={onNewSession}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="12" y1="5" x2="12" y2="19"/>
@@ -139,10 +86,7 @@ function TitleBar({
           <button 
             className="toolbar-btn"
             title="工具栏"
-            onClick={() => {
-              console.log('[TitleBar] 点击切换工具栏');
-              onToggleToolSidebar?.();
-            }}
+            onClick={onToggleToolSidebar}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -152,10 +96,7 @@ function TitleBar({
           <button 
             className="toolbar-btn"
             title="命令栏"
-            onClick={() => {
-              console.log('[TitleBar] 点击切换命令栏');
-              onToggleCommandBar?.();
-            }}
+            onClick={onToggleCommandBar}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -164,18 +105,12 @@ function TitleBar({
           </button>
         </div>
 
-        <div className="flex items-center h-full">
+        <div className="flex items-center h-full windows-controls">
           <button
             className="window-btn minimize"
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              console.log('[TitleBar] 最小化按钮点击');
-              handleMinimize();
-            }}
+            onClick={handleMinimize}
             title="最小化"
             type="button"
-            style={{ pointerEvents: 'auto' }}
           >
             <svg width="10" height="1" viewBox="0 0 10 1">
               <line x1="0" y1="0.5" x2="10" y2="0.5" stroke="currentColor" strokeWidth="1"/>
@@ -183,15 +118,9 @@ function TitleBar({
           </button>
           <button
             className="window-btn maximize"
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              console.log('[TitleBar] 最大化按钮点击');
-              handleMaximize();
-            }}
+            onClick={handleMaximize}
             title={isMaximized ? '还原' : '最大化'}
             type="button"
-            style={{ pointerEvents: 'auto' }}
           >
             {isMaximized ? (
               <svg width="10" height="10" viewBox="0 0 10 10">
@@ -206,15 +135,9 @@ function TitleBar({
           </button>
           <button
             className="window-btn close"
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              console.log('[TitleBar] 关闭按钮点击');
-              handleClose();
-            }}
+            onClick={handleClose}
             title="关闭"
             type="button"
-            style={{ pointerEvents: 'auto' }}
           >
             <svg width="10" height="10" viewBox="0 0 10 10">
               <line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" strokeWidth="1"/>
