@@ -77,16 +77,22 @@ function LayoutContent() {
   }, []);
 
   const handleCloseSession = useCallback(async (sessionId: string) => {
+    console.log('关闭会话:', sessionId);
     try {
       await invoke('close_session', { sessionId });
-      setSessions(prev => prev.filter(s => s.id !== sessionId));
-      if (currentSession?.id === sessionId) {
-        setCurrentSession(sessions.find(s => s.id !== sessionId) || null);
-      }
+      console.log('会话已关闭:', sessionId);
+      setSessions(prev => {
+        const newSessions = prev.filter(s => s.id !== sessionId);
+        // 如果关闭的是当前会话，切换到第一个可用会话
+        if (currentSession?.id === sessionId) {
+          setCurrentSession(newSessions.length > 0 ? newSessions[0] : null);
+        }
+        return newSessions;
+      });
     } catch (error) {
       console.error('关闭会话失败:', error);
     }
-  }, [currentSession, sessions]);
+  }, [currentSession]);
 
   return (
     <div className="flex h-screen flex-col bg-[var(--color-bg-deep)]">

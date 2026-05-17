@@ -169,6 +169,9 @@ impl PtyManager {
             .map_err(|e| anyhow::anyhow!("请求 PTY 失败: {}", e))?;
 
         channel.shell().map_err(|e| anyhow::anyhow!("启动 Shell 失败: {}", e))?;
+        
+        // 设置非阻塞模式，否则读取会阻塞
+        channel.set_nonblocking(true);
 
         let pid = self.next_pid();
         let process = PtyProcess {

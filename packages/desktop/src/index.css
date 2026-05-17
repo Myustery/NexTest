@@ -313,11 +313,13 @@ body {
   opacity: 0;
   transition: opacity 0.1s ease;
   flex-shrink: 0;
+  pointer-events: none;
 }
 
 .tab-item:hover .tab-close,
 .tab-item.active .tab-close {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .tab-item .tab-close:hover {

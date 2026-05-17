@@ -353,11 +353,16 @@ function TerminalArea({
               <span className="tab-icon">{getShellIcon(session.shell, session.protocol)}</span>
               <span className="tab-label">{session.name}</span>
               <button
-                onClick={(e) => {
+                onMouseDown={(e) => {
                   e.stopPropagation();
+                }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('TerminalArea 关闭按钮点击:', session.id);
                   onCloseSession(session.id);
                 }}
-                className="tab-close"
+                className="tab-close cursor-pointer"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <line x1="18" y1="6" x2="6" y2="18"/>
