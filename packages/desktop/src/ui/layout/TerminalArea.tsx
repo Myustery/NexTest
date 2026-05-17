@@ -412,12 +412,6 @@ function TerminalArea({
     onCloseSession(sessionId);
   }, [onCloseSession]);
 
-  const handleSessionCloseClick = useCallback((e: React.MouseEvent, sessionId: string) => {
-    e.stopPropagation();
-    log.info(`会话关闭按钮点击 | sessionId=${sessionId}`);
-    onCloseSession(sessionId);
-  }, [onCloseSession]);
-
   const lines = commandText.split('\n');
 
   return (
