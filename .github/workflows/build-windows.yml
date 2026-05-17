@@ -98,6 +98,45 @@ jobs:
           }
         shell: pwsh
 
+      - name: 测试运行 exe
+        run: |
+          $exeFile = Get-ChildItem -Path "." -Filter "NexTest-*-Portable.exe" | Select-Object -First 1
+          if (-not $exeFile) {
+            Write-Error "找不到 exe 文件"
+            exit 1
+          }
+          Write-Host "测试运行: $($exeFile.FullName)"
+          
+          # 启动 exe，等待最多 10 秒
+          $process = Start-Process -FilePath $exeFile.FullName -PassThru -WindowStyle Hidden
+          Start-Sleep -Seconds 5
+          
+          # 检查进程是否还在运行
+          if ($process.HasExited) {
+            $exitCode = $process.ExitCode
+            Write-Host "进程已退出，退出码: $exitCode"
+            
+            # 检查日志文件
+            $logFiles = @("nextest-debug.log", "nextest-startup.log", "nextest-crash.log")
+            foreach ($log in $logFiles) {
+              if (Test-Path $log) {
+                Write-Host "=== $log ==="
+                Get-Content $log
+              }
+            }
+            
+            if ($exitCode -ne 0) {
+              Write-Error "程序异常退出，退出码: $exitCode"
+              exit 1
+            }
+          } else {
+            Write-Host "程序正常运行中，PID: $($process.Id)"
+            # 成功启动，终止进程
+            Stop-Process -Id $process.Id -Force
+            Write-Host "测试通过！"
+          }
+        shell: pwsh
+
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
         with:
