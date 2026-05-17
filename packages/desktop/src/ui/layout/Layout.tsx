@@ -218,18 +218,31 @@ function LayoutContent() {
               <span className="text-xs text-[var(--color-fg-muted)]">全局命令</span>
             </div>
             
-            <textarea
-              value={globalCommandText}
-              onChange={(e) => setGlobalCommandText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleGlobalCommandRun();
-                }
-              }}
-              placeholder="输入命令，按 Enter 执行..."
-              className="w-full h-[calc(100%-28px)] p-2 bg-transparent border-none outline-none resize-none text-[var(--color-fg)] text-sm font-mono"
-            />
+            <div className="flex-1 flex">
+              <div 
+                className="flex-shrink-0 w-[40px] bg-[var(--color-bg)] border-r border-[var(--color-border-subtle)] overflow-hidden select-none"
+                style={{ fontSize: '12px', fontFamily: "'JetBrains Mono', monospace", lineHeight: '1.5' }}
+              >
+                {globalCommandText.split('\n').map((_, i) => (
+                  <div key={i} className="text-right pr-2 text-[var(--color-fg-subtle)]">
+                    {i + 1}
+                  </div>
+                ))}
+              </div>
+              <textarea
+                value={globalCommandText}
+                onChange={(e) => setGlobalCommandText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleGlobalCommandRun();
+                  }
+                }}
+                placeholder="输入命令，按 Enter 执行..."
+                className="flex-1 p-2 bg-transparent border-none outline-none resize-none text-[var(--color-fg)] text-sm font-mono"
+                style={{ lineHeight: '1.5' }}
+              />
+            </div>
           </div>
         </>
       )}

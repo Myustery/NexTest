@@ -259,14 +259,20 @@ function SessionPanel({
                       </div>
                       <div className={`status-dot ${currentSession?.id === session.id ? 'running' : 'idle'}`} />
                       <button
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                        }}
                         onClick={(e) => {
                           e.stopPropagation();
+                          e.preventDefault();
                           console.log('[SessionPanel] 关闭按钮点击 | sessionId=' + session.id);
                           onCloseSession(session.id);
                         }}
-                        className="btn-icon ml-1 opacity-0 group-hover:opacity-100 cursor-pointer"
+                        className="btn-icon ml-1 opacity-0 group-hover:opacity-100"
                         title="关闭终端"
                         type="button"
+                        style={{ pointerEvents: 'auto', cursor: 'pointer' }}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <line x1="18" y1="6" x2="6" y2="18"/>

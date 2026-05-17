@@ -430,9 +430,19 @@ function TerminalArea({
               <span className="tab-icon">{getShellIcon(session.shell, session.protocol)}</span>
               <span className="tab-label">{session.name}</span>
               <button
-                onClick={(e) => handleTabClose(e, session.id)}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  log.info(`Tab关闭按钮点击 | sessionId=${sessionId}`);
+                  onCloseSession(sessionId);
+                }}
                 className="tab-close"
                 type="button"
+                style={{ pointerEvents: 'auto' }}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <line x1="18" y1="6" x2="6" y2="18"/>
@@ -507,7 +517,11 @@ function TerminalArea({
       >
         {currentSession ? (
           <div className="flex flex-col h-full">
-            <div ref={containerRef} className="flex-1 w-full overflow-hidden" />
+            <div 
+              ref={containerRef} 
+              className="flex-1 w-full overflow-hidden"
+              style={{ minHeight: '100px' }}
+            />
             
             <div 
               className="h-[3px] cursor-row-resize bg-[var(--color-border-subtle)] hover:bg-[var(--color-primary)]"
@@ -544,7 +558,17 @@ function TerminalArea({
                 <span className="text-xs text-[var(--color-fg-muted)]">命令编辑</span>
               </div>
               
-              <div className="flex-1 overflow-hidden">
+              <div className="flex-1 overflow-hidden flex">
+                <div 
+                  className="flex-shrink-0 w-[40px] bg-[var(--color-bg)] border-r border-[var(--color-border-subtle)] overflow-hidden select-none"
+                  style={{ fontSize: '12px', fontFamily: "'JetBrains Mono', monospace", lineHeight: '1.5' }}
+                >
+                  {commandText.split('\n').map((_, i) => (
+                    <div key={i} className="text-right pr-2 text-[var(--color-fg-subtle)]">
+                      {i + 1}
+                    </div>
+                  ))}
+                </div>
                 <textarea
                   value={commandText}
                   onChange={(e) => setCommandText(e.target.value)}
@@ -555,7 +579,8 @@ function TerminalArea({
                     }
                   }}
                   placeholder="输入命令，按 Enter 执行..."
-                  className="w-full h-full p-2 bg-transparent border-none outline-none resize-none text-[var(--color-fg)] text-sm font-mono"
+                  className="flex-1 p-2 bg-transparent border-none outline-none resize-none text-[var(--color-fg)] text-sm font-mono"
+                  style={{ lineHeight: '1.5' }}
                 />
               </div>
             </div>

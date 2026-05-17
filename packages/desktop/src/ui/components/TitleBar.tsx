@@ -164,12 +164,18 @@ function TitleBar({
           </button>
         </div>
 
-        <div className="flex items-center h-full windows-controls">
+        <div className="flex items-center h-full">
           <button
             className="window-btn minimize"
-            onClick={handleMinimize}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              console.log('[TitleBar] 最小化按钮点击');
+              handleMinimize();
+            }}
             title="最小化"
             type="button"
+            style={{ pointerEvents: 'auto' }}
           >
             <svg width="10" height="1" viewBox="0 0 10 1">
               <line x1="0" y1="0.5" x2="10" y2="0.5" stroke="currentColor" strokeWidth="1"/>
@@ -177,9 +183,15 @@ function TitleBar({
           </button>
           <button
             className="window-btn maximize"
-            onClick={handleMaximize}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              console.log('[TitleBar] 最大化按钮点击');
+              handleMaximize();
+            }}
             title={isMaximized ? '还原' : '最大化'}
             type="button"
+            style={{ pointerEvents: 'auto' }}
           >
             {isMaximized ? (
               <svg width="10" height="10" viewBox="0 0 10 10">
@@ -194,9 +206,15 @@ function TitleBar({
           </button>
           <button
             className="window-btn close"
-            onClick={handleClose}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              console.log('[TitleBar] 关闭按钮点击');
+              handleClose();
+            }}
             title="关闭"
             type="button"
+            style={{ pointerEvents: 'auto' }}
           >
             <svg width="10" height="10" viewBox="0 0 10 10">
               <line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" strokeWidth="1"/>
