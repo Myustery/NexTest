@@ -25,7 +25,7 @@ export default {
         },
       },
       fontFamily: {
-        mono: ['Consolas', 'Monaco', 'Courier New', 'monospace'],
+        mono: ["'JetBrains Mono'", "'Fira Code'", 'Consolas', 'Monaco', "'Courier New'", 'monospace'],
       },
     },
   },

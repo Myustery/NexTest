@@ -1,69 +1,241 @@
-/**
- * 主布局组件
- * 
- * 包含会话管理区、终端区、工具侧边栏和全局命令编辑区
- */
-
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Outlet } from 'react-router-dom';
 import SessionPanel from './SessionPanel';
 import TerminalArea from './TerminalArea';
 import ToolSidebar from './ToolSidebar';
-import GlobalCommand from './GlobalCommand';
+import { ContextMenuProvider, useContextMenu } from '../components/ContextMenu';
 
-/**
- * 主布局组件
- * 
- * 结构：
- * ┌──────────┬─────────────────────────────────────┬─────────┐
- * │ 会话管理区 │              终端区                  │ 工具栏   │
- * │ (可折叠)  │  [Tab1] [Tab2] [分身] [+]           │ (可折叠) │
- * │          │  ┌────────────┬────────────┐       │  🔧     │
- * │ 📁 文件夹1 │  │  终端界面1   │  终端界面2  │       │  📦     │
- * │   ├ 会话A  │  │             │             │       │  ...    │
- * │   └ 会话B  │  ├────────────┴────────────┤       │         │
- * │ 📁 文件夹2 │  │ 命令编辑区（可折叠，可拖拽）│       │         │
- * │   └ 会话C  │  │ [Tab1][Tab2][+]   ▶ ⏹      │       │         │
- * ├──────────┴─────────────────────────────────────┴─────────┤
- * │                   全局命令编辑页面（底部）                    │
- * │                   [Tab1][Tab2][+]        ▶ ⏹              │
- * └───────────────────────────────────────────────────────────┘
- */
-function Layout() {
-  // 会话管理区是否折叠
+interface SessionInfo {
+  id: string;
+  name: string;
+  shell: string;
+  created_at: number;
+}
+
+const ACTIVITY_ITEMS = [
+  { id: 'explorer', icon: 'files', tooltip: '资源管理器' },
+  { id: 'search', icon: 'search', tooltip: '搜索' },
+  { id: 'git', icon: 'git', tooltip: '源代码管理' },
+  { id: 'debug', icon: 'debug', tooltip: '运行和调试' },
+  { id: 'extensions', icon: 'extensions', tooltip: '扩展' },
+];
+
+function LayoutContent() {
   const [sessionCollapsed, setSessionCollapsed] = useState(false);
-  // 工具侧边栏是否折叠
   const [toolCollapsed, setToolCollapsed] = useState(true);
+  const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [currentSession, setCurrentSession] = useState<SessionInfo | null>(null);
+  const [activeActivity, setActiveActivity] = useState<string>('explorer');
+  const { showMenu } = useContextMenu();
+
+  const handleCreateSession = useCallback((name: string, shell?: string) => {
+    const newSession: SessionInfo = {
+      id: `session-${Date.now()}`,
+      name,
+      shell: shell || 'powershell',
+      created_at: Date.now(),
+    };
+    setSessions(prev => [...prev, newSession]);
+    setCurrentSession(newSession);
+  }, []);
+
+  const handleCloseSession = useCallback((sessionId: string) => {
+    setSessions(prev => prev.filter(s => s.id !== sessionId));
+    if (currentSession?.id === sessionId) {
+      setCurrentSession(sessions.find(s => s.id !== sessionId) || null);
+    }
+  }, [currentSession, sessions]);
+
+  const handleActivityContextMenu = useCallback((e: React.MouseEvent, item: typeof ACTIVITY_ITEMS[0]) => {
+    e.preventDefault();
+    e.stopPropagation();
+    showMenu(e.clientX, e.clientY, [
+      {
+        label: item.tooltip,
+        disabled: true,
+      },
+      { divider: true, label: '' },
+      {
+        label: '隐藏侧边栏',
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <line x1="9" y1="3" x2="9" y2="21"/>
+          </svg>
+        ),
+        onClick: () => setSessionCollapsed(true),
+      },
+    ]);
+  }, [showMenu]);
+
+  const handleStatusBarContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    showMenu(e.clientX, e.clientY, [
+      {
+        label: '复制状态',
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="9" y="9" width="13" height="13" rx="2"/>
+            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+          </svg>
+        ),
+        onClick: () => {},
+      },
+      { divider: true, label: '' },
+      {
+        label: '设置',
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33"/>
+          </svg>
+        ),
+        onClick: () => {},
+      },
+    ]);
+  }, [showMenu]);
+
+  const renderIcon = (icon: string) => {
+    switch (icon) {
+      case 'files':
+        return (
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/>
+            <polyline points="13,2 13,9 20,9"/>
+          </svg>
+        );
+      case 'search':
+        return (
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+        );
+      case 'git':
+        return (
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <circle cx="18" cy="18" r="3"/>
+            <circle cx="6" cy="6" r="3"/>
+            <circle cx="6" cy="18" r="3"/>
+            <path d="M6 9v6M6 15a3 3 0 003 3h3"/>
+          </svg>
+        );
+      case 'debug':
+        return (
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M12 2L12 6M12 18L12 22M6 12H2M22 12H18"/>
+            <circle cx="12" cy="12" r="4"/>
+          </svg>
+        );
+      case 'extensions':
+        return (
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="3" y="3" width="7" height="7" rx="1"/>
+            <rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="3" y="14" width="7" height="7" rx="1"/>
+            <rect x="14" y="14" width="7" height="7" rx="1"/>
+          </svg>
+        );
+      case 'settings':
+        return (
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+          </svg>
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
-    <div className="flex h-screen flex-col">
-      {/* 主内容区 */}
+    <div className="flex h-screen flex-col bg-[var(--color-bg-deep)]">
       <div className="flex flex-1 overflow-hidden">
-        {/* 会话管理区（左侧） */}
+        <div className="flex w-12 flex-col items-center bg-[var(--color-bg-elevated)] py-1">
+          {ACTIVITY_ITEMS.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => {
+                setActiveActivity(item.id);
+                if (item.id === 'explorer' && sessionCollapsed) {
+                  setSessionCollapsed(false);
+                }
+              }}
+              onContextMenu={(e) => handleActivityContextMenu(e, item)}
+              className={`activity-bar-icon ${activeActivity === item.id ? 'active' : ''}`}
+              title={item.tooltip}
+            >
+              {renderIcon(item.icon)}
+            </button>
+          ))}
+          
+          <div className="mt-auto">
+            <button
+              className="activity-bar-icon"
+              title="设置"
+            >
+              {renderIcon('settings')}
+            </button>
+          </div>
+        </div>
+
         <SessionPanel
           collapsed={sessionCollapsed}
           onToggle={() => setSessionCollapsed(!sessionCollapsed)}
+          sessions={sessions}
+          currentSession={currentSession}
+          onSelectSession={setCurrentSession}
+          onCreateSession={handleCreateSession}
+          onCloseSession={handleCloseSession}
         />
 
-        {/* 终端区（中间） */}
         <TerminalArea
-          sessionCollapsed={sessionCollapsed}
-          toolCollapsed={toolCollapsed}
+          currentSession={currentSession}
+          sessions={sessions}
+          onSelectSession={setCurrentSession}
+          onCloseSession={handleCloseSession}
         />
 
-        {/* 工具侧边栏（右侧） */}
         <ToolSidebar
           collapsed={toolCollapsed}
           onToggle={() => setToolCollapsed(!toolCollapsed)}
         />
       </div>
 
-      {/* 全局命令编辑页面（底部） */}
-      <GlobalCommand />
-
-      {/* 子路由出口 */}
+      <div 
+        className="flex h-[22px] items-center justify-between border-t border-[var(--color-border-subtle)] bg-[var(--color-primary)] px-2 text-[11px] text-white/90"
+        onContextMenu={handleStatusBarContextMenu}
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="20,6 9,17 4,12"/>
+            </svg>
+            <span>就绪</span>
+          </div>
+          {currentSession && (
+            <span className="text-white/70">
+              {currentSession.name} · {currentSession.shell}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-4 text-white/70">
+          <span>NexTest Web v0.1.0</span>
+          <span>UTF-8</span>
+        </div>
+      </div>
+      
       <Outlet />
     </div>
+  );
+}
+
+function Layout() {
+  return (
+    <ContextMenuProvider>
+      <LayoutContent />
+    </ContextMenuProvider>
   );
 }
 

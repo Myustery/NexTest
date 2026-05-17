@@ -1,80 +1,463 @@
-/**
- * 终端区组件（中间）
- * 
- * 功能：
- * - 顶部 Tab 页签栏
- * - 中部终端界面（支持分屏）
- * - 底部命令编辑页面（可折叠）
- */
+import { useRef, useEffect, useState, useCallback } from 'react';
+import { Terminal } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
+import { WebLinksAddon } from '@xterm/addon-web-links';
+import '@xterm/xterm/css/xterm.css';
+import { useContextMenu } from '../components/ContextMenu';
 
-import { useState } from 'react';
-
-interface TerminalAreaProps {
-  /** 会话管理区是否折叠 */
-  sessionCollapsed: boolean;
-  /** 工具侧边栏是否折叠 */
-  toolCollapsed: boolean;
+interface SessionInfo {
+  id: string;
+  name: string;
+  shell: string;
+  created_at: number;
 }
 
-/**
- * 终端区组件
- * 
- * 自适应宽度，最小宽度 400px
- */
-function TerminalArea({ sessionCollapsed: _sessionCollapsed, toolCollapsed: _toolCollapsed }: TerminalAreaProps) {
-  // 命令编辑区是否折叠
-  const [commandEditorCollapsed, setCommandEditorCollapsed] = useState(true);
+interface TerminalAreaProps {
+  currentSession: SessionInfo | null;
+  sessions: SessionInfo[];
+  onSelectSession: (session: SessionInfo) => void;
+  onCloseSession: (sessionId: string) => void;
+}
+
+const TERMINAL_THEME = {
+  foreground: '#cccccc',
+  background: '#1e1e1e',
+  cursor: '#ffffff',
+  cursorAccent: '#1e1e1e',
+  selectionBackground: '#264f78',
+  selectionForeground: '#ffffff',
+  black: '#000000',
+  red: '#cd3131',
+  green: '#0dbc79',
+  yellow: '#e5e510',
+  blue: '#2472c8',
+  magenta: '#bc3fbc',
+  cyan: '#11a8cd',
+  white: '#e5e5e5',
+  brightBlack: '#666666',
+  brightRed: '#f14c4c',
+  brightGreen: '#23d18b',
+  brightYellow: '#f5f543',
+  brightBlue: '#3b8eea',
+  brightMagenta: '#d670d6',
+  brightCyan: '#29b8db',
+  brightWhite: '#e5e5e5',
+};
+
+const terminals = new Map<string, { term: Terminal; fit: FitAddon }>();
+
+function TerminalArea({
+  currentSession,
+  sessions,
+  onSelectSession,
+  onCloseSession,
+}: TerminalAreaProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const { showMenu } = useContextMenu();
+
+  const createTerminal = useCallback((sessionId: string) => {
+    const term = new Terminal({
+      fontSize: 14,
+      fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, 'Courier New', monospace",
+      fontWeight: '400',
+      lineHeight: 1.2,
+      letterSpacing: 0,
+      theme: TERMINAL_THEME,
+      cursorBlink: true,
+      cursorStyle: 'bar',
+      cursorWidth: 2,
+      scrollback: 10000,
+      allowProposedApi: true,
+      smoothScrollDuration: 100,
+    });
+
+    const fit = new FitAddon();
+    const links = new WebLinksAddon();
+
+    term.loadAddon(fit);
+    term.loadAddon(links);
+
+    terminals.set(sessionId, { term, fit });
+
+    return { term, fit };
+  }, []);
+
+  const mountTerminal = useCallback((sessionId: string) => {
+    if (!containerRef.current) return;
+
+    containerRef.current.innerHTML = '';
+
+    let terminalData = terminals.get(sessionId);
+    if (!terminalData) {
+      terminalData = createTerminal(sessionId);
+    }
+
+    const { term, fit } = terminalData;
+
+    if (!term.element) {
+      term.open(containerRef.current);
+      term.writeln('\x1b[1;36m欢迎使用 NexTest Web\x1b[0m');
+      term.writeln('\x1b[90m提示: Web 版本为模拟终端，不支持真实 shell 命令\x1b[0m');
+      term.writeln('');
+      term.write('$ ');
+    }
+
+    requestAnimationFrame(() => fit.fit());
+
+    term.onData((data) => {
+      if (data === '\r') {
+        term.writeln('');
+        term.write('$ ');
+      } else if (data === '\x7f') {
+        term.write('\b \b');
+      } else {
+        term.write(data);
+      }
+    });
+  }, [createTerminal]);
+
+  useEffect(() => {
+    return () => {
+      terminals.forEach(({ term }) => term.dispose());
+      terminals.clear();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (currentSession) {
+      mountTerminal(currentSession.id);
+    }
+  }, [currentSession, mountTerminal]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (currentSession) {
+        const terminalData = terminals.get(currentSession.id);
+        if (terminalData) {
+          requestAnimationFrame(() => terminalData.fit.fit());
+        }
+      }
+    };
+
+    const resizeObserver = new ResizeObserver(handleResize);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [currentSession]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.ctrlKey && e.key === 'f') {
+      e.preventDefault();
+      setShowSearch(true);
+    }
+    if (e.key === 'Escape' && showSearch) {
+      setShowSearch(false);
+      setSearchTerm('');
+    }
+  }, [showSearch]);
+
+  const handleTerminalContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const terminalData = currentSession ? terminals.get(currentSession.id) : null;
+
+    showMenu(e.clientX, e.clientY, [
+      {
+        label: '复制',
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="9" y="9" width="13" height="13" rx="2"/>
+            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+          </svg>
+        ),
+        shortcut: 'Ctrl+Shift+C',
+        onClick: () => {
+          if (terminalData) {
+            const selection = terminalData.term.getSelection();
+            if (selection) {
+              navigator.clipboard.writeText(selection);
+            }
+          }
+        },
+        disabled: !terminalData?.term.hasSelection(),
+      },
+      {
+        label: '粘贴',
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/>
+            <rect x="8" y="2" width="8" height="4" rx="1"/>
+          </svg>
+        ),
+        shortcut: 'Ctrl+Shift+V',
+        onClick: async () => {
+          const text = await navigator.clipboard.readText();
+          if (text && terminalData) {
+            terminalData.term.write(text);
+          }
+        },
+      },
+      {
+        label: '全选',
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+          </svg>
+        ),
+        shortcut: 'Ctrl+Shift+A',
+        onClick: () => {
+          if (terminalData) {
+            terminalData.term.selectAll();
+          }
+        },
+      },
+      { divider: true, label: '' },
+      {
+        label: '清屏',
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+          </svg>
+        ),
+        onClick: () => {
+          if (terminalData) {
+            terminalData.term.clear();
+          }
+        },
+      },
+      {
+        label: '搜索',
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+        ),
+        shortcut: 'Ctrl+F',
+        onClick: () => setShowSearch(true),
+      },
+      { divider: true, label: '' },
+      {
+        label: '分屏',
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <line x1="12" y1="3" x2="12" y2="21"/>
+          </svg>
+        ),
+        disabled: true,
+      },
+      {
+        label: '拆分终端',
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+          </svg>
+        ),
+        disabled: true,
+      },
+    ]);
+  }, [currentSession, showMenu]);
+
+  const handleTabContextMenu = useCallback((e: React.MouseEvent, session: SessionInfo) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    showMenu(e.clientX, e.clientY, [
+      {
+        label: '关闭',
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        ),
+        shortcut: 'Ctrl+W',
+        onClick: () => onCloseSession(session.id),
+      },
+      {
+        label: '关闭其他',
+        onClick: () => {
+          sessions.filter(s => s.id !== session.id).forEach(s => onCloseSession(s.id));
+        },
+      },
+      {
+        label: '关闭所有',
+        onClick: () => {
+          sessions.forEach(s => onCloseSession(s.id));
+        },
+      },
+      { divider: true, label: '' },
+      {
+        label: '重命名',
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+          </svg>
+        ),
+        disabled: true,
+      },
+    ]);
+  }, [sessions, onCloseSession, showMenu]);
+
+  const getShellIcon = (shell: string) => {
+    switch (shell) {
+      case 'powershell':
+      case 'pwsh':
+        return '⚡';
+      case 'bash':
+      case 'wsl':
+        return '🐧';
+      case 'cmd':
+        return '🖥️';
+      case 'ssh':
+        return '🔐';
+      case 'telnet':
+        return '🌐';
+      case 'serial':
+        return '🔌';
+      default:
+        return '⌨️';
+    }
+  };
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      {/* Tab 页签栏 */}
-      <div className="flex items-center border-b border-[var(--color-border)] bg-[#252526]">
-        {/* Tab 列表 */}
-        <div className="flex flex-1 overflow-x-auto">
-          {/* TODO: 实现 Tab 列表 */}
-          <div className="flex items-center px-4 py-2 text-sm text-gray-400">
-            暂无打开的终端
+    <div className="flex flex-1 flex-col overflow-hidden" onKeyDown={handleKeyDown}>
+      <div className="flex h-[var(--tab-height)] items-center bg-[var(--color-bg-elevated)]">
+        <div className="flex flex-1 items-center overflow-x-auto scrollbar-none">
+          {sessions.map((session) => (
+            <div
+              key={session.id}
+              onClick={() => onSelectSession(session)}
+              onContextMenu={(e) => handleTabContextMenu(e, session)}
+              className={`tab-item ${currentSession?.id === session.id ? 'active' : ''}`}
+            >
+              <span className="tab-icon">{getShellIcon(session.shell)}</span>
+              <span className="tab-label">{session.name}</span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCloseSession(session.id);
+                }}
+                className="tab-close"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+          ))}
+
+          {sessions.length === 0 && (
+            <div className="tab-item active">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="tab-icon">
+                <polyline points="4,17 10,11 4,5"/>
+                <line x1="12" y1="19" x2="20" y2="19"/>
+              </svg>
+              <span className="tab-label">欢迎使用</span>
+            </div>
+          )}
+        </div>
+
+        <div className="monaco-toolbar px-2">
+          {showSearch && (
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="搜索..."
+              className="input-field mr-2 w-[150px]"
+              autoFocus
+            />
+          )}
+          <button
+            onClick={() => setShowSearch(!showSearch)}
+            title="搜索 (Ctrl+F)"
+            className="flex items-center justify-center"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+          </button>
+          <button
+            title="清屏"
+            onClick={() => {
+              if (currentSession) {
+                const terminalData = terminals.get(currentSession.id);
+                if (terminalData) {
+                  terminalData.term.clear();
+                }
+              }
+            }}
+            className="flex items-center justify-center"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {currentSession && (
+        <div className="breadcrumb">
+          <div className="breadcrumb-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+              <polyline points="9,22 9,12 15,12 15,22"/>
+            </svg>
+            <span>{currentSession.shell}</span>
+          </div>
+          <span className="breadcrumb-separator">›</span>
+          <div className="breadcrumb-item">
+            <span className="text-[var(--color-fg)]">{currentSession.name}</span>
           </div>
         </div>
+      )}
 
-        {/* 新建 Tab 按钮 */}
-        <button
-          className="px-3 py-2 text-gray-400 hover:text-white"
-          title="新建终端"
-        >
-          +
-        </button>
-      </div>
-
-      {/* 终端界面 */}
-      <div className="flex-1 overflow-hidden bg-[var(--color-bg)]">
-        {/* TODO: 实现 xterm.js 终端 */}
-        <div className="flex h-full items-center justify-center text-gray-500">
-          创建或选择一个会话开始使用
-        </div>
-      </div>
-
-      {/* 命令编辑区（可折叠） */}
-      <div
-        className={`border-t border-[var(--color-border)] bg-[#252526] transition-all duration-200 ${
-          commandEditorCollapsed ? 'h-8' : 'h-[200px] min-h-[100px]'
-        }`}
+      <div 
+        className="relative flex-1 overflow-hidden bg-[var(--color-bg-deep)]"
+        onContextMenu={handleTerminalContextMenu}
+        data-context-menu
       >
-        {/* 命令编辑区头部 */}
-        <div
-          className="flex cursor-pointer items-center justify-between px-3 py-1"
-          onClick={() => setCommandEditorCollapsed(!commandEditorCollapsed)}
-        >
-          <span className="text-xs text-gray-400">命令编辑</span>
-          <span className="text-xs text-gray-400">
-            {commandEditorCollapsed ? '▲' : '▼'}
-          </span>
-        </div>
-
-        {/* 命令编辑区内容 */}
-        {!commandEditorCollapsed && (
-          <div className="flex-1 px-3">
-            {/* TODO: 实现命令编辑器 */}
+        {currentSession ? (
+          <div ref={containerRef} className="h-full w-full" />
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <div className="text-center animate-fadeIn">
+              <div className="mb-6">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="mx-auto text-[var(--color-fg-subtle)]">
+                  <polyline points="4,17 10,11 4,5"/>
+                  <line x1="12" y1="19" x2="20" y2="19"/>
+                </svg>
+              </div>
+              <div className="mb-2 text-lg text-[var(--color-fg-muted)]">
+                开始使用 NexTest Web
+              </div>
+              <div className="text-sm text-[var(--color-fg-subtle)]">
+                在左侧创建新终端会话
+              </div>
+              <div className="mt-6 flex items-center justify-center gap-4 text-xs text-[var(--color-fg-subtle)]">
+                <div className="flex items-center gap-1">
+                  <kbd className="rounded bg-[var(--color-bg-elevated)] px-1.5 py-0.5">Ctrl</kbd>
+                  <span>+</span>
+                  <kbd className="rounded bg-[var(--color-bg-elevated)] px-1.5 py-0.5">`</kbd>
+                  <span className="ml-1">切换终端</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

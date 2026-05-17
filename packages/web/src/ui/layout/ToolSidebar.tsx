@@ -1,63 +1,171 @@
-/**
- * 工具侧边栏组件（右侧）
- * 
- * 功能：
- * - 命令工具等一系列工具
- * - 默认折叠，显示图标
- * - 点击图标展开
- * - 展开时推开终端区
- */
+import { useState } from 'react';
 
 interface ToolSidebarProps {
-  /** 是否折叠 */
   collapsed: boolean;
-  /** 折叠/展开回调 */
   onToggle: () => void;
 }
 
-/**
- * 工具侧边栏组件
- * 
- * 默认宽度 250px，最小宽度 200px，可调整
- */
-function ToolSidebar({ collapsed, onToggle }: ToolSidebarProps) {
-  return (
-    <div
-      className={`flex border-l border-[var(--color-border)] bg-[#252526] transition-all duration-200 ${
-        collapsed ? 'w-10' : 'w-[250px] min-w-[200px]'
-      }`}
-    >
-      {/* 图标栏（始终显示） */}
-      <div className="flex w-10 flex-col items-center gap-2 border-r border-[var(--color-border)] py-2">
-        <button
-          onClick={() => collapsed && onToggle()}
-          className={`rounded p-2 ${
-            collapsed ? 'text-gray-400 hover:text-white hover:bg-[#3e3e3e]' : 'text-[var(--color-primary)] bg-[#3e3e3e]'
-          }`}
-          title="命令工具"
-        >
-          ⌘
-        </button>
+const QUICK_COMMANDS = [
+  { id: 'ls', label: 'ls -la', description: '列出所有文件' },
+  { id: 'clear', label: 'clear', description: '清屏' },
+  { id: 'pwd', label: 'pwd', description: '当前目录' },
+  { id: 'git-status', label: 'git status', description: 'Git 状态' },
+  { id: 'npm-test', label: 'npm test', description: '运行测试' },
+  { id: 'npm-dev', label: 'npm run dev', description: '开发模式' },
+];
 
-        {/* 折叠按钮 */}
-        {!collapsed && (
+const SNIPPETS = [
+  { id: '1', name: '项目构建', commands: ['npm install', 'npm run build'] },
+  { id: '2', name: 'Git 提交', commands: ['git add .', 'git commit -m "update"'] },
+];
+
+function ToolSidebar({ collapsed, onToggle }: ToolSidebarProps) {
+  const [activeTab, setActiveTab] = useState<'commands' | 'snippets'>('commands');
+  const [expandedSnippets, setExpandedSnippets] = useState<Set<string>>(new Set());
+
+  const toggleSnippet = (id: string) => {
+    const newExpanded = new Set(expandedSnippets);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
+    } else {
+      newExpanded.add(id);
+    }
+    setExpandedSnippets(newExpanded);
+  };
+
+  if (collapsed) {
+    return null;
+  }
+
+  return (
+    <div className="flex w-[var(--sidebar-width)] min-w-[180px] max-w-[400px] flex-col border-l border-[var(--color-border-subtle)] bg-[var(--color-bg)]">
+      <div className="flex h-[var(--panel-header-height)] items-center justify-between border-b border-[var(--color-border-subtle)] px-3">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-fg-muted)]">
+          工具
+        </span>
+        <div className="monaco-toolbar">
           <button
             onClick={onToggle}
-            className="mt-auto rounded p-2 text-gray-400 hover:text-white hover:bg-[#3e3e3e]"
-            title="折叠"
+            title="关闭面板"
+            className="flex items-center justify-center"
           >
-            ▶
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
           </button>
-        )}
+        </div>
       </div>
 
-      {/* 展开内容 */}
-      {!collapsed && (
-        <div className="flex-1 overflow-y-auto p-3">
-          <div className="text-sm text-gray-400">命令工具</div>
-          {/* TODO: 实现命令工具列表 */}
-        </div>
-      )}
+      <div className="flex border-b border-[var(--color-border-subtle)]">
+        <button
+          onClick={() => setActiveTab('commands')}
+          className={`flex-1 px-3 py-2 text-[11px] font-medium transition-colors ${
+            activeTab === 'commands'
+              ? 'border-b-2 border-[var(--color-primary)] text-[var(--color-fg)]'
+              : 'text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]'
+          }`}
+        >
+          快捷命令
+        </button>
+        <button
+          onClick={() => setActiveTab('snippets')}
+          className={`flex-1 px-3 py-2 text-[11px] font-medium transition-colors ${
+            activeTab === 'snippets'
+              ? 'border-b-2 border-[var(--color-primary)] text-[var(--color-fg)]'
+              : 'text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]'
+          }`}
+        >
+          命令片段
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto py-1">
+        {activeTab === 'commands' && (
+          <div className="panel-section">
+            <div className="px-2">
+              {QUICK_COMMANDS.map((cmd) => (
+                <div
+                  key={cmd.id}
+                  className="list-item group"
+                  title={cmd.description}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-2 text-[var(--color-fg-subtle)]">
+                    <polyline points="4,17 10,11 4,5"/>
+                    <line x1="12" y1="19" x2="20" y2="19"/>
+                  </svg>
+                  <span className="flex-1 truncate font-mono text-[12px]">{cmd.label}</span>
+                  <button
+                    className="btn-icon opacity-0 group-hover:opacity-100"
+                    title="执行"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                      <polygon points="5,3 19,12 5,21"/>
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="separator mx-2 my-2" />
+            <button className="mx-2 flex w-[calc(100%-16px)] items-center justify-center gap-1 rounded border border-dashed border-[var(--color-border)] py-2 text-[11px] text-[var(--color-fg-muted)] transition-colors hover:border-[var(--color-fg-muted)] hover:text-[var(--color-fg)]">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              添加快捷命令
+            </button>
+          </div>
+        )}
+
+        {activeTab === 'snippets' && (
+          <div className="panel-section">
+            {SNIPPETS.map((snippet) => (
+              <div key={snippet.id}>
+                <div
+                  onClick={() => toggleSnippet(snippet.id)}
+                  className="panel-section-header"
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className={`mr-1 transition-transform ${expandedSnippets.has(snippet.id) ? 'rotate-180' : ''}`}
+                  >
+                    <polyline points="6,9 12,15 18,9"/>
+                  </svg>
+                  <span className="flex-1">{snippet.name}</span>
+                  <span className="text-[var(--color-fg-subtle)]">{snippet.commands.length}</span>
+                </div>
+                {expandedSnippets.has(snippet.id) && (
+                  <div className="animate-slideIn">
+                    {snippet.commands.map((cmd, index) => (
+                      <div key={index} className="list-item pl-6">
+                        <span className="flex-1 truncate font-mono text-[12px]">{cmd}</span>
+                        <button className="btn-icon opacity-0 group-hover:opacity-100" title="执行">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="5,3 19,12 5,21"/>
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+            <div className="separator mx-2 my-2" />
+            <button className="mx-2 flex w-[calc(100%-16px)] items-center justify-center gap-1 rounded border border-dashed border-[var(--color-border)] py-2 text-[11px] text-[var(--color-fg-muted)] transition-colors hover:border-[var(--color-fg-muted)] hover:text-[var(--color-fg)]">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              新建命令片段
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

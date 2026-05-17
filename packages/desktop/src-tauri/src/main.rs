@@ -1,6 +1,4 @@
 //! NexTest 桌面端主程序
-//!
-//! 基于 Tauri 框架实现，提供原生终端体验
 
 #![cfg_attr(
     all(not(debug_assertions), target_os = "windows"),
@@ -8,6 +6,7 @@
 )]
 
 mod commands;
+mod db;
 mod pty;
 
 use std::fs::File;
@@ -97,6 +96,11 @@ fn main() {
     write_startup_banner();
     init_file_logger();
 
+    // 初始化数据库
+    if let Err(e) = db::init_db() {
+        tracing::error!("数据库初始化失败: {}", e);
+    }
+
     tracing::info!("{} 桌面端启动中...", APP_NAME);
 
     let state = AppState {
@@ -109,18 +113,31 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             tracing::info!("单实例回调触发");
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_focus();
             }
         }))
+        .on_window_event(|_window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                tracing::info!("窗口关闭请求");
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             commands::create_session,
             commands::close_session,
             commands::execute_command,
             commands::get_sessions,
             commands::get_pty_processes,
+            commands::get_serial_ports,
+            commands::write_pty,
+            commands::read_pty,
+            commands::resize_pty,
+            commands::save_session,
+            commands::delete_session,
+            commands::update_session,
         ])
         .manage(state)
         .setup(|app| {
