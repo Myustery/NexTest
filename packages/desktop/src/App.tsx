@@ -5,8 +5,6 @@
 import { useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Layout from './ui/layout/Layout';
-import TerminalPage from './ui/pages/TerminalPage';
-import SettingsPage from './ui/pages/SettingsPage';
 
 /**
  * 应用根组件
